@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Sistema de Control de Propiedades</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <style>
+    body{background:#f4f6fb;font-family:Arial,sans-serif}
+    .topbar{background:#24466f;color:white;padding:14px 22px}
+    .section{display:none}.section.active{display:block}
+    .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#eef3fb}
+    .login-card{width:420px;border:0;border-radius:18px;box-shadow:0 12px 32px rgba(0,0,0,.12)}
+    .app{display:none}
+    .metric-card{color:white;border-radius:12px;padding:20px}
+    .bg-paid{background:#28936f}.bg-pending{background:#df4f5f}.bg-total{background:#f5a623}
+    .sidebar-button{border:none;background:transparent;color:#24466f;font-weight:600}
+    .table-matrix th{background:#edf1f7;font-size:13px;white-space:nowrap}
+    .payment-cell{min-width:135px;border-radius:8px;padding:8px;font-size:12px}
+    .cell-pagado{background:#d8f3e5;border-left:4px solid #28a745}
+    .cell-pendiente{background:#ffe0e3;border-left:4px solid #dc3545}
+    .cell-parcial{background:#fff2cc;border-left:4px solid #ffc107}
+    .btn-icon{width:32px;height:32px;padding:0}
+    .toast-box{position:fixed;right:20px;bottom:20px;z-index:9999;max-width:420px}
+    .api-pill{font-size:12px;background:#e9eef8;color:#24466f;border-radius:99px;padding:4px 10px}
+    .temporal-card{border:0;border-radius:14px;box-shadow:0 4px 14px rgba(0,0,0,.06)}
+    .temporal-table th{background:#edf1f7;font-size:13px;white-space:nowrap}
+    .temporal-table td{font-size:13px;vertical-align:middle}
+    .badge-soft{background:#eef3fb;color:#24466f;border-radius:999px;padding:4px 8px;font-size:12px}
+  </style>
+</head>
+
+<body>
+
+<div id="loginScreen" class="login-wrap">
+  <div class="card login-card p-4">
+    <div class="text-center mb-3">
+      <i class="bi bi-building fs-1 text-primary"></i>
+      <h4 id="txtLoginTitle">Acceso al sistema</h4>
+      <p class="text-muted" id="txtLoginSub">Ingrese sus credenciales</p>
+    </div>
+
+    <label id="txtUser">Usuario</label>
+    <input id="loginUsername" class="form-control mb-2" value="admin">
+
+    <label id="txtPassword">Contraseña</label>
+    <input id="loginPassword" class="form-control mb-3" type="password" value="admin">
+
+    <button class="btn btn-primary w-100" onclick="login()" id="txtLoginBtn">Ingresar</button>
+
+    <small class="text-muted mt-3 d-block" id="txtLoginNote">
+      La empresa se obtiene desde la base de datos.
+    </small>
+  </div>
+</div>
+
+<div id="app" class="app">
+  <div class="topbar d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <i class="bi bi-building"></i>
+      <strong id="txtAppTitle">Sistema de Control de Propiedades</strong>
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+      <span class="api-pill" id="empresaActual"></span>
+
+      <select id="lang" class="form-select form-select-sm" style="width:130px" onchange="setLang(this.value)">
+        <option value="es">Español</option>
+        <option value="en">English</option>
+        <option value="zh">中文</option>
+      </select>
+
+      <button class="btn btn-light btn-sm" onclick="logout()" id="txtLogout">Salir</button>
+    </div>
+  </div>
+
+  <div class="container-fluid p-4">
+    <div class="card p-3 mb-3">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-2">
+          <label id="txtYear">Año</label>
+          <select id="anioGlobal" class="form-select" onchange="refreshMain()">
+            <option>2024</option>
+            <option>2025</option>
+            <option selected>2026</option>
+            <option>2027</option>
+          </select>
+        </div>
+
+        <div class="col-md-2">
+          <label id="txtMonth">Mes</label>
+          <select id="mesGlobal" class="form-select" onchange="refreshMain()"></select>
+        </div>
+
+        <div class="col-md-3">
+          <button class="btn btn-success w-100" onclick="exportarTodo()">
+            <i class="bi bi-file-earmark-excel"></i> <span id="txtExportAll">Exportar todo a Excel</span>
+          </button>
+        </div>
+
+        <div class="col-md-3">
+          <button class="btn btn-primary w-100" onclick="initApp()">
+            <i class="bi bi-arrow-clockwise"></i> <span id="txtReload">Recargar</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="mb-4 d-flex gap-3 flex-wrap">
+      <button class="sidebar-button" onclick="show('dashboard')"><i class="bi bi-bar-chart"></i> <span id="navDashboard">Dashboard</span></button>
+      <button class="sidebar-button" onclick="show('propietarios')"><i class="bi bi-person-badge"></i> <span id="navOwners">Propietarios</span></button>
+      <button class="sidebar-button" onclick="show('propiedades')"><i class="bi bi-buildings"></i> <span id="navProperties">Propiedades</span></button>
+      <button class="sidebar-button" onclick="show('conceptos')"><i class="bi bi-list-check"></i> <span id="navConcepts">Conceptos</span></button>
+      <button class="sidebar-button" onclick="show('pagos')"><i class="bi bi-table"></i> <span id="navPayments">Control de Pagos</span></button>
+      <button class="sidebar-button" onclick="show('historiales')"><i class="bi bi-clock-history"></i> <span id="navTime">Temporalidad</span></button>
+    </div>
+
+    <section id="dashboard" class="section active">
+      <h4 id="titleDashboard">Dashboard</h4>
+
+      <div class="row g-3 mb-4">
+        <div class="col-md-4">
+          <div class="metric-card bg-paid">
+            <div id="txtPaidDone">Pagos Realizados</div>
+            <h3 id="totalPagado">S/ 0.00</h3>
+            <small id="cantidadPagadas"></small>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="metric-card bg-pending">
+            <div id="txtPaidPending">Pagos Pendientes</div>
+            <h3 id="totalPendiente">S/ 0.00</h3>
+            <small id="cantidadPendientes"></small>
+          </div>
+        </div>
+
+        <div class="col-md-4">
+          <div class="metric-card bg-total">
+            <div id="txtObligations">Obligaciones</div>
+            <h3 id="totalObligaciones">S/ 0.00</h3>
+            <small id="cantidadObligaciones"></small>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-3 mb-3">
+        <h6 id="txtMonthlySummary">Resumen Mensual de Pagos</h6>
+        <canvas id="chartMensual" height="90"></canvas>
+      </div>
+
+      <div class="card p-3">
+        <h6 id="txtLastObligations">Últimas obligaciones</h6>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered">
+            <thead>
+              <tr>
+                <th id="thLastProperty">Propiedad</th>
+                <th id="thLastConcept">Concepto</th>
+                <th id="thLastPeriod">Periodo</th>
+                <th id="thLastAmount">Monto</th>
+                <th id="thLastBalance">Saldo</th>
+                <th id="thLastStatus">Estado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tablaUltimasObligaciones"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="propietarios" class="section">
+      <div class="d-flex justify-content-between mb-3">
+        <h4 id="titleOwners">Propietarios</h4>
+        <button class="btn btn-primary" onclick="openPropietarioModal()" id="btnNewOwner">Nuevo</button>
+      </div>
+
+      <table class="table table-bordered bg-white">
+        <thead>
+          <tr>
+            <th id="thOwnerName">Nombre</th>
+            <th id="thOwnerDocument">Documento</th>
+            <th id="thOwnerPhone">Teléfono</th>
+            <th>Email</th>
+            <th id="thOwnerActions">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tablaPropietarios"></tbody>
+      </table>
+    </section>
+
+    <section id="propiedades" class="section">
+      <div class="d-flex justify-content-between mb-3">
+        <h4 id="titleProperties">Propiedades</h4>
+        <button class="btn btn-primary" onclick="openPropiedadModal()" id="btnNewProperty">Nueva</button>
+      </div>
+
+      <table class="table table-bordered bg-white">
+        <thead>
+          <tr>
+            <th id="thPropertyCode">Código</th>
+            <th id="thPropertyName">Nombre</th>
+            <th id="thPropertyType">Tipo</th>
+            <th id="thPropertyAddress">Dirección</th>
+            <th id="thPropertyStatus">Estado</th>
+            <th id="thPropertyActions">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tablaPropiedades"></tbody>
+      </table>
+    </section>
+
+    <section id="conceptos" class="section">
+      <div class="d-flex justify-content-between mb-3">
+        <h4 id="titleConcepts">Conceptos</h4>
+        <button class="btn btn-primary" onclick="openConceptoModal()" id="btnNewConcept">Nuevo</button>
+      </div>
+
+      <table class="table table-bordered bg-white">
+        <thead>
+          <tr>
+            <th id="thConceptName">Nombre</th>
+            <th id="thConceptFrequency">Frecuencia</th>
+            <th id="thConceptActions">Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tablaConceptos"></tbody>
+      </table>
+    </section>
+
+    <section id="pagos" class="section">
+      <div class="d-flex justify-content-between mb-3">
+        <h4 id="titlePayments">Control de Pagos</h4>
+        <button class="btn btn-success" onclick="openGenerarModal()" id="btnGenerateObligations">Generar Obligaciones</button>
+      </div>
+
+      <div class="card p-3 mb-3">
+        <div class="row g-2">
+          <div class="col-md-2">
+            <select id="filtroAnio" class="form-select" onchange="loadMatriz()"></select>
+          </div>
+
+          <div class="col-md-3">
+            <select id="filtroConcepto" class="form-select" onchange="loadMatriz()"></select>
+          </div>
+
+          <div class="col-md-2">
+            <select id="filtroEstado" class="form-select" onchange="loadMatriz()">
+              <option value="">Todos</option>
+              <option value="PENDIENTE">Pendiente</option>
+              <option value="PARCIAL">Parcial</option>
+              <option value="PAGADO">Pagado</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-3 table-responsive">
+        <table class="table table-bordered table-matrix">
+          <thead id="theadMatriz"></thead>
+          <tbody id="tbodyMatriz"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="historiales" class="section">
+      <h4 id="titleTime">Temporalidad</h4>
+
+      <div class="card p-3 mb-3">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-5">
+            <label id="lblTimeProperty">Propiedad</label>
+            <select id="histPropiedad" class="form-select" onchange="loadHistoriales()"></select>
+          </div>
+
+          <div class="col-md-7 d-flex gap-2 flex-wrap">
+            <button class="btn btn-primary" onclick="openEstadoModal()" id="btnAddStatus">Agregar Estado</button>
+            <button class="btn btn-primary" onclick="openPropietarioHistModal()" id="btnAddOwner">Agregar Dueño</button>
+            <button class="btn btn-primary" onclick="openConceptoHistModal()" id="btnAddConceptAmount">Agregar Concepto/Monto</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-lg-4">
+          <div class="card p-3 temporal-card">
+            <h6 id="titleStatusHistory">Estados</h6>
+            <div class="table-responsive">
+              <table class="table table-sm table-bordered temporal-table">
+                <thead>
+                  <tr>
+                    <th id="thStatusState">Estado</th>
+                    <th id="thStatusStart">Inicio</th>
+                    <th id="thStatusEnd">Fin</th>
+                    <th id="thStatusReason">Motivo</th>
+                    <th id="thStatusActions">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tablaEstadosHist"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-4">
+          <div class="card p-3 temporal-card">
+            <h6 id="titleOwnerHistory">Dueños</h6>
+            <div class="table-responsive">
+              <table class="table table-sm table-bordered temporal-table">
+                <thead>
+                  <tr>
+                    <th id="thOwnerHistOwner">Propietario</th>
+                    <th>%</th>
+                    <th id="thOwnerHistStart">Inicio</th>
+                    <th id="thOwnerHistEnd">Fin</th>
+                    <th id="thOwnerHistActions">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tablaPropietariosHist"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-4">
+          <div class="card p-3 temporal-card">
+            <h6 id="titleConceptHistory">Conceptos/Montos</h6>
+            <div class="table-responsive">
+              <table class="table table-sm table-bordered temporal-table">
+                <thead>
+                  <tr>
+                    <th id="thConceptHistConcept">Concepto</th>
+                    <th id="thConceptHistAmount">Monto</th>
+                    <th id="thConceptHistFrequency">Frecuencia</th>
+                    <th id="thConceptHistStart">Inicio</th>
+                    <th id="thConceptHistEnd">Fin</th>
+                    <th id="thConceptHistActions">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tablaConceptosHist"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- MODAL PROPIEDAD -->
+<div class="modal fade" id="modalPropiedad" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5>Propiedad</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input id="propiedadId" type="hidden">
+        <input id="propCodigo" class="form-control mb-2" placeholder="Código">
+        <input id="propNombre" class="form-control mb-2" placeholder="Nombre">
+        <select id="propTipo" class="form-select mb-2">
+          <option value="DEPARTAMENTO">Departamento</option>
+          <option value="CENTRO_COMERCIAL">Centro Comercial</option>
+        </select>
+        <input id="propDireccion" class="form-control" placeholder="Dirección">
+      </div>
+      <div class="modal-footer"><button class="btn btn-primary" onclick="savePropiedad()">Guardar</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONCEPTO -->
+<div class="modal fade" id="modalConcepto" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5>Concepto</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input id="conceptoId" type="hidden">
+        <input id="conceptoNombre" class="form-control mb-2" placeholder="Nombre">
+        <select id="conceptoFrecuencia" class="form-select">
+          <option value="MENSUAL">Mensual</option>
+          <option value="ANUAL">Anual</option>
+        </select>
+      </div>
+      <div class="modal-footer"><button class="btn btn-primary" onclick="saveConcepto()">Guardar</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PROPIETARIO -->
+<div class="modal fade" id="modalPropietario" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5>Propietario</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input id="propietarioId" type="hidden">
+        <input id="propietarioNombre" class="form-control mb-2" placeholder="Nombre">
+        <input id="propietarioDocumento" class="form-control mb-2" placeholder="Documento">
+        <input id="propietarioTelefono" class="form-control mb-2" placeholder="Teléfono">
+        <input id="propietarioEmail" class="form-control" placeholder="Email">
+      </div>
+      <div class="modal-footer"><button class="btn btn-primary" onclick="savePropietario()">Guardar</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL GENERAR -->
+<div class="modal fade" id="modalGenerar" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5>Generar Obligaciones</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <label>Año</label>
+        <select id="genAnio" class="form-select mb-2"></select>
+
+        <label>Mes</label>
+        <select id="genMes" class="form-select mb-2"></select>
+
+        <label>Propiedad</label>
+        <select id="genPropiedad" class="form-select mb-2"></select>
+
+        <label>Concepto</label>
+        <select id="genConcepto" class="form-select"></select>
+      </div>
+      <div class="modal-footer"><button class="btn btn-success" onclick="generarObligaciones()">Generar</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PAGO -->
+<div class="modal fade" id="modalPago" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5>Registrar Pago</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input id="pagoObligacionId" type="hidden">
+        <div id="pagoInfo" class="alert alert-info"></div>
+        <input id="pagoMonto" type="number" class="form-control mb-2" placeholder="Monto">
+        <select id="pagoMoneda" class="form-select mb-2"></select>
+        <input id="pagoTipoCambio" type="number" step="0.000001" class="form-control mb-2" placeholder="Tipo de cambio">
+        <input id="pagoFecha" type="date" class="form-control mb-2">
+        <textarea id="pagoObs" class="form-control" placeholder="Observación"></textarea>
+      </div>
+      <div class="modal-footer"><button class="btn btn-primary" onclick="registrarPago()">Registrar</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ESTADO HIST -->
+<div class="modal fade" id="modalEstadoHist" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5>Estado</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <select id="estadoHistEstado" class="form-select mb-2">
+          <option value="ACTIVA">Activa</option>
+          <option value="INHABILITADA">Inhabilitada</option>
+          <option value="VENDIDA">Vendida</option>
+          <option value="EN_MANTENIMIENTO">Mantenimiento</option>
+        </select>
+        <input id="estadoHistInicio" type="date" class="form-control mb-2">
+        <input id="estadoHistFin" type="date" class="form-control mb-2">
+        <input id="estadoHistMotivo" class="form-control" placeholder="Motivo">
+      </div>
+      <div class="modal-footer"><button class="btn btn-primary" onclick="saveEstadoHist()">Guardar</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PROPIETARIO HIST -->
+<div class="modal fade" id="modalPropietarioHist" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5>Dueño</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <select id="propietarioHistId" class="form-select mb-2"></select>
+        <input id="propietarioHistPorcentaje" type="number" value="100" class="form-control mb-2">
+        <input id="propietarioHistInicio" type="date" class="form-control mb-2">
+        <input id="propietarioHistFin" type="date" class="form-control">
+      </div>
+      <div class="modal-footer"><button class="btn btn-primary" onclick="savePropietarioHist()">Guardar</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONCEPTO HIST -->
+<div class="modal fade" id="modalConceptoHist" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5>Concepto/Monto</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <select id="conceptoHistId" class="form-select mb-2"></select>
+        <input id="conceptoHistMonto" type="number" class="form-control mb-2" placeholder="Monto">
+        <select id="conceptoHistMoneda" class="form-select mb-2"></select>
+        <select id="conceptoHistFrecuencia" class="form-select mb-2">
+          <option value="MENSUAL">Mensual</option>
+          <option value="ANUAL">Anual</option>
+        </select>
+        <input id="conceptoHistInicio" type="date" class="form-control mb-2">
+        <input id="conceptoHistFin" type="date" class="form-control">
+      </div>
+      <div class="modal-footer"><button class="btn btn-primary" onclick="saveConceptoHist()">Guardar</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-box" id="toastBox"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+const API_BASE = "http://159.89.228.158:5001/api";
+const $ = id => document.getElementById(id);
+const meses = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+
+let session = JSON.parse(localStorage.getItem("session") || "null");
+let chart = null;
+let modals = {};
+
+const state = {
+  monedas: [],
+  propietarios: [],
+  propiedades: [],
+  conceptos: [],
+  obligaciones: [],
+  matriz: [],
+  dashboardMensual: []
+};
+
+const textos = {
+  es: {
+    app:"Sistema de Control de Propiedades", login:"Acceso al sistema", user:"Usuario", password:"Contraseña", enter:"Ingresar", logout:"Salir",
+    dashboard:"Dashboard", owners:"Propietarios", properties:"Propiedades", concepts:"Conceptos", payments:"Control de Pagos", time:"Temporalidad",
+    export:"Exportar todo a Excel", reload:"Recargar", year:"Año", month:"Mes",
+    paidDone:"Pagos Realizados", paidPending:"Pagos Pendientes", obligations:"Obligaciones", monthlySummary:"Resumen Mensual de Pagos", lastObligations:"Últimas obligaciones",
+    property:"Propiedad", concept:"Concepto", period:"Periodo", amount:"Monto", balance:"Saldo", status:"Estado", actions:"Acciones",
+    newOwner:"Nuevo", newProperty:"Nueva", newConcept:"Nuevo", generateObligations:"Generar Obligaciones",
+    name:"Nombre", document:"Documento", phone:"Teléfono", code:"Código", type:"Tipo", address:"Dirección", frequency:"Frecuencia",
+    addStatus:"Agregar Estado", addOwner:"Agregar Dueño", addConceptAmount:"Agregar Concepto/Monto",
+    statusHistory:"Estados", ownerHistory:"Dueños", conceptHistory:"Conceptos/Montos", start:"Inicio", end:"Fin", reason:"Motivo",
+    owner:"Propietario", annul:"Anular", edit:"Editar", pay:"Pagar", all:"Todos", allConcepts:"Todos los conceptos", paid:"Pagado", pending:"Pendiente"
+  },
+  en: {
+    app:"Property Control System", login:"System Access", user:"User", password:"Password", enter:"Login", logout:"Logout",
+    dashboard:"Dashboard", owners:"Owners", properties:"Properties", concepts:"Concepts", payments:"Payment Control", time:"Temporality",
+    export:"Export all to Excel", reload:"Reload", year:"Year", month:"Month",
+    paidDone:"Completed Payments", paidPending:"Pending Payments", obligations:"Obligations", monthlySummary:"Monthly Payment Summary", lastObligations:"Latest obligations",
+    property:"Property", concept:"Concept", period:"Period", amount:"Amount", balance:"Balance", status:"Status", actions:"Actions",
+    newOwner:"New", newProperty:"New", newConcept:"New", generateObligations:"Generate Obligations",
+    name:"Name", document:"Document", phone:"Phone", code:"Code", type:"Type", address:"Address", frequency:"Frequency",
+    addStatus:"Add Status", addOwner:"Add Owner", addConceptAmount:"Add Concept/Amount",
+    statusHistory:"Statuses", ownerHistory:"Owners", conceptHistory:"Concepts/Amounts", start:"Start", end:"End", reason:"Reason",
+    owner:"Owner", annul:"Annul", edit:"Edit", pay:"Pay", all:"All", allConcepts:"All concepts", paid:"Paid", pending:"Pending"
+  },
+  zh: {
+    app:"物业管理系统", login:"系统登录", user:"用户", password:"密码", enter:"登录", logout:"退出",
+    dashboard:"仪表板", owners:"业主", properties:"物业", concepts:"费用项目", payments:"付款管理", time:"时间记录",
+    export:"导出到Excel", reload:"刷新", year:"年份", month:"月份",
+    paidDone:"已完成付款", paidPending:"待付款", obligations:"应付款", monthlySummary:"每月付款汇总", lastObligations:"最新应付款",
+    property:"物业", concept:"费用项目", period:"期间", amount:"金额", balance:"余额", status:"状态", actions:"操作",
+    newOwner:"新增", newProperty:"新增", newConcept:"新增", generateObligations:"生成应付款",
+    name:"名称", document:"证件", phone:"电话", code:"编号", type:"类型", address:"地址", frequency:"频率",
+    addStatus:"添加状态", addOwner:"添加业主", addConceptAmount:"添加费用/金额",
+    statusHistory:"状态记录", ownerHistory:"业主记录", conceptHistory:"费用/金额记录", start:"开始", end:"结束", reason:"原因",
+    owner:"业主", annul:"作废", edit:"编辑", pay:"付款", all:"全部", allConcepts:"所有费用项目", paid:"已付款", pending:"待付款"
+  }
+};
+
+function safeSet(id, value) {
+  const el = $(id);
+  if (el) el.innerHTML = value;
+}
+
+function setLang(lang) {
+  localStorage.setItem("lang", lang);
+  const t = textos[lang] || textos.es;
+
+  if ($("lang")) $("lang").value = lang;
+
+  safeSet("txtAppTitle", t.app);
+  safeSet("txtLoginTitle", t.login);
+  safeSet("txtUser", t.user);
+  safeSet("txtPassword", t.password);
+  safeSet("txtLoginBtn", t.enter);
+  safeSet("txtLogout", t.logout);
+
+  safeSet("txtYear", t.year);
+  safeSet("txtMonth", t.month);
+  safeSet("txtExportAll", t.export);
+  safeSet("txtReload", t.reload);
+
+  safeSet("navDashboard", t.dashboard);
+  safeSet("navOwners", t.owners);
+  safeSet("navProperties", t.properties);
+  safeSet("navConcepts", t.concepts);
+  safeSet("navPayments", t.payments);
+  safeSet("navTime", t.time);
+
+  safeSet("titleDashboard", t.dashboard);
+  safeSet("titleOwners", t.owners);
+  safeSet("titleProperties", t.properties);
+  safeSet("titleConcepts", t.concepts);
+  safeSet("titlePayments", t.payments);
+  safeSet("titleTime", t.time);
+
+  safeSet("txtPaidDone", t.paidDone);
+  safeSet("txtPaidPending", t.paidPending);
+  safeSet("txtObligations", t.obligations);
+  safeSet("txtMonthlySummary", t.monthlySummary);
+  safeSet("txtLastObligations", t.lastObligations);
+
+  safeSet("thLastProperty", t.property);
+  safeSet("thLastConcept", t.concept);
+  safeSet("thLastPeriod", t.period);
+  safeSet("thLastAmount", t.amount);
+  safeSet("thLastBalance", t.balance);
+  safeSet("thLastStatus", t.status);
+
+  safeSet("btnNewOwner", t.newOwner);
+  safeSet("btnNewProperty", t.newProperty);
+  safeSet("btnNewConcept", t.newConcept);
+  safeSet("btnGenerateObligations", t.generateObligations);
+
+  safeSet("thOwnerName", t.name);
+  safeSet("thOwnerDocument", t.document);
+  safeSet("thOwnerPhone", t.phone);
+  safeSet("thOwnerActions", t.actions);
+
+  safeSet("thPropertyCode", t.code);
+  safeSet("thPropertyName", t.name);
+  safeSet("thPropertyType", t.type);
+  safeSet("thPropertyAddress", t.address);
+  safeSet("thPropertyStatus", t.status);
+  safeSet("thPropertyActions", t.actions);
+
+  safeSet("thConceptName", t.name);
+  safeSet("thConceptFrequency", t.frequency);
+  safeSet("thConceptActions", t.actions);
+
+  safeSet("lblTimeProperty", t.property);
+  safeSet("btnAddStatus", t.addStatus);
+  safeSet("btnAddOwner", t.addOwner);
+  safeSet("btnAddConceptAmount", t.addConceptAmount);
+
+  safeSet("titleStatusHistory", t.statusHistory);
+  safeSet("titleOwnerHistory", t.ownerHistory);
+  safeSet("titleConceptHistory", t.conceptHistory);
+
+  safeSet("thStatusState", t.status);
+  safeSet("thStatusStart", t.start);
+  safeSet("thStatusEnd", t.end);
+  safeSet("thStatusReason", t.reason);
+  safeSet("thStatusActions", t.actions);
+
+  safeSet("thOwnerHistOwner", t.owner);
+  safeSet("thOwnerHistStart", t.start);
+  safeSet("thOwnerHistEnd", t.end);
+  safeSet("thOwnerHistActions", t.actions);
+
+  safeSet("thConceptHistConcept", t.concept);
+  safeSet("thConceptHistAmount", t.amount);
+  safeSet("thConceptHistFrequency", t.frequency);
+  safeSet("thConceptHistStart", t.start);
+  safeSet("thConceptHistEnd", t.end);
+  safeSet("thConceptHistActions", t.actions);
+
+  setup();
+  fillConceptos();
+  renderChart();
+  renderPropietarios();
+  renderPropiedades();
+  renderConceptos();
+  renderUltimasObligaciones();
+  renderMatriz();
+}
+
+function api(path, opt = {}) {
+  return fetch(API_BASE + path, {
+    headers: { "Content-Type": "application/json" },
+    ...opt
+  }).then(async r => {
+    if (!r.ok) throw new Error(await r.text());
+    if (r.status === 204) return null;
+    const text = await r.text();
+    return text ? JSON.parse(text) : null;
+  });
+}
+
+function toast(message, type = "success") {
+  if (!$("toastBox")) return;
+  $("toastBox").innerHTML = `<div class="alert alert-${type} shadow">${message}</div>`;
+  setTimeout(() => $("toastBox").innerHTML = "", 3500);
+}
+
+function err(e) {
+  console.error(e);
+  toast(e.message || "Error", "danger");
+}
+
+function empresaId() {
+  return session?.empresaId;
+}
+
+function anio() {
+  return Number($("anioGlobal")?.value || new Date().getFullYear());
+}
+
+function mes() {
+  return $("mesGlobal")?.value ? Number($("mesGlobal").value) : null;
+}
+
+function money(value, symbol = "S/") {
+  return `${symbol || "S/"} ${Number(value || 0).toLocaleString("es-PE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })}`;
+}
+
+function show(id) {
+  document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+  if ($(id)) $(id).classList.add("active");
+}
+
+function showApp() {
+  if (session) {
+    $("loginScreen").style.display = "none";
+    $("app").style.display = "block";
+    safeSet("empresaActual", session.empresaRazonSocial || "");
+    initApp();
+  } else {
+    $("loginScreen").style.display = "flex";
+    $("app").style.display = "none";
+  }
+}
+
+async function login() {
+  try {
+    session = await api("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({
+        username: $("loginUsername").value,
+        password: $("loginPassword").value
+      })
+    });
+
+    localStorage.setItem("session", JSON.stringify(session));
+    showApp();
+  } catch(e) {
+    err(e);
+  }
+}
+
+function logout() {
+  localStorage.removeItem("session");
+  session = null;
+  showApp();
+}
+
+async function initApp() {
+  try {
+    await loadMonedas();
+    await Promise.all([loadPropietarios(), loadPropiedades(), loadConceptos()]);
+    await refreshMain();
+    await loadHistoriales();
+  } catch(e) {
+    err(e);
+  }
+}
+
+async function refreshMain() {
+  await Promise.all([
+    loadDashboard(),
+    loadObligaciones(),
+    loadMatriz(),
+    loadDashboardMensual()
+  ]);
+}
+
+async function loadMonedas() {
+  state.monedas = await api("/monedas");
+  fillMonedas();
+}
+
+async function loadPropietarios() {
+  state.propietarios = await api(`/propietarios?empresaId=${empresaId()}`);
+  renderPropietarios();
+  fillPropietarios();
+}
+
+async function loadPropiedades() {
+  state.propiedades = await api(`/propiedades?empresaId=${empresaId()}`);
+  renderPropiedades();
+  fillPropiedades();
+}
+
+async function loadConceptos() {
+  state.conceptos = await api(`/conceptos-pago?empresaId=${empresaId()}`);
+  renderConceptos();
+  fillConceptos();
+}
+
+async function loadDashboard() {
+  const q = new URLSearchParams({ empresaId: empresaId(), anio: anio() });
+  if (mes()) q.set("mes", mes());
+
+  const d = await api(`/dashboard/resumen?${q}`);
+
+  safeSet("totalPagado", money(d.totalPagado || d.total_pagado));
+  safeSet("totalPendiente", money(d.totalPendiente || d.total_pendiente));
+  safeSet("totalObligaciones", money(d.totalObligaciones || d.total_obligaciones));
+  safeSet("cantidadPagadas", `${d.cantidadPagadas || d.cantidad_pagadas || 0} pagos`);
+  safeSet("cantidadPendientes", `${d.cantidadPendientes || d.cantidad_pendientes || 0} pendientes`);
+  safeSet("cantidadObligaciones", `${d.cantidadObligaciones || d.cantidad_obligaciones || 0} obligaciones`);
+}
+
+async function loadDashboardMensual() {
+  state.dashboardMensual = await api(`/dashboard/mensual?empresaId=${empresaId()}&anio=${anio()}`);
+  renderChart();
+}
+
+async function loadObligaciones() {
+  const q = new URLSearchParams({ empresaId: empresaId(), anio: anio() });
+  if (mes()) q.set("mes", mes());
+
+  state.obligaciones = await api(`/obligaciones?${q}`);
+  renderUltimasObligaciones();
+}
+
+async function loadMatriz() {
+  const q = new URLSearchParams({
+    empresaId: empresaId(),
+    anio: $("filtroAnio")?.value || anio()
+  });
+
+  if ($("filtroConcepto")?.value) q.set("conceptoId", $("filtroConcepto").value);
+  if ($("filtroEstado")?.value) q.set("estado", $("filtroEstado").value);
+
+  state.matriz = await api(`/matriz-pagos?${q}`);
+  renderMatriz();
+}
+
+async function loadHistoriales() {
+  const id = Number($("histPropiedad")?.value || state.propiedades[0]?.id || 0);
+  if (!id) return;
+
+  $("histPropiedad").value = id;
+
+  const [estados, propietarios, conceptos] = await Promise.all([
+    api(`/propiedades/${id}/estados-historial`),
+    api(`/propiedades/${id}/propietarios-historial`),
+    api(`/propiedades/${id}/conceptos-historial`)
+  ]);
+
+  const t = textos[localStorage.getItem("lang") || "es"] || textos.es;
+
+  safeSet("tablaEstadosHist", estados.map(x => `
+    <tr>
+      <td><span class="badge-soft">${x.estado}</span></td>
+      <td>${date(x.fecha_inicio || x.fechaInicio)}</td>
+      <td>${date(x.fecha_fin || x.fechaFin) || "-"}</td>
+      <td>${x.motivo || "-"}</td>
+      <td><button class="btn btn-sm btn-danger" onclick="anularHist('estado',${x.id})">${t.annul}</button></td>
+    </tr>
+  `).join(""));
+
+  safeSet("tablaPropietariosHist", propietarios.map(x => `
+    <tr>
+      <td>${x.propietario || "-"}</td>
+      <td>${x.porcentaje || 0}%</td>
+      <td>${date(x.fecha_inicio || x.fechaInicio)}</td>
+      <td>${date(x.fecha_fin || x.fechaFin) || "-"}</td>
+      <td><button class="btn btn-sm btn-danger" onclick="anularHist('propietario',${x.id})">${t.annul}</button></td>
+    </tr>
+  `).join(""));
+
+  safeSet("tablaConceptosHist", conceptos.map(x => `
+    <tr>
+      <td>${x.concepto || "-"}</td>
+      <td>${money(x.monto, x.moneda_codigo)}</td>
+      <td>${x.frecuencia || "-"}</td>
+      <td>${date(x.fecha_inicio || x.fechaInicio)}</td>
+      <td>${date(x.fecha_fin || x.fechaFin) || "-"}</td>
+      <td><button class="btn btn-sm btn-danger" onclick="anularHist('concepto',${x.id})">${t.annul}</button></td>
+    </tr>
+  `).join(""));
+}
+
+function date(v) {
+  return v ? String(v).substring(0, 10) : "";
+}
+
+function renderChart() {
+  if (!$("chartMensual")) return;
+
+  const labels = meses;
+  const dataPagado = state.dashboardMensual.map(x => x.pagado || 0);
+  const dataPendiente = state.dashboardMensual.map(x => x.pendiente || 0);
+
+  if (chart) chart.destroy();
+
+  chart = new Chart($("chartMensual"), {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        { label: "Pagado", data: dataPagado, backgroundColor: "#28936f" },
+        { label: "Pendiente", data: dataPendiente, backgroundColor: "#df4f5f" }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: "bottom" } },
+      scales: {
+        x: { stacked: true },
+        y: { stacked: true, beginAtZero: true }
+      }
+    }
+  });
+}
+
+function renderPropietarios() {
+  const t = textos[localStorage.getItem("lang") || "es"] || textos.es;
+  safeSet("tablaPropietarios", state.propietarios.map(p => `
+    <tr>
+      <td>${p.nombre}</td>
+      <td>${p.documento || "-"}</td>
+      <td>${p.telefono || "-"}</td>
+      <td>${p.email || "-"}</td>
+      <td>
+        <button class="btn btn-sm btn-primary" onclick="openPropietarioModal(${p.id})">${t.edit}</button>
+        <button class="btn btn-sm btn-danger" onclick="anular('/propietarios/${p.id}/anular')">${t.annul}</button>
+      </td>
+    </tr>
+  `).join(""));
+}
+
+function renderPropiedades() {
+  const t = textos[localStorage.getItem("lang") || "es"] || textos.es;
+  safeSet("tablaPropiedades", state.propiedades.map(p => `
+    <tr>
+      <td>${p.codigo}</td>
+      <td>${p.nombre}</td>
+      <td>${p.tipo}</td>
+      <td>${p.direccion || "-"}</td>
+      <td>${p.estado_actual || p.estadoActual || "-"}</td>
+      <td>
+        <button class="btn btn-sm btn-primary" onclick="openPropiedadModal(${p.id})">${t.edit}</button>
+        <button class="btn btn-sm btn-secondary" onclick="goTemporalidad(${p.id})">${t.time}</button>
+        <button class="btn btn-sm btn-danger" onclick="anular('/propiedades/${p.id}/anular')">${t.annul}</button>
+      </td>
+    </tr>
+  `).join(""));
+}
+
+function renderConceptos() {
+  const t = textos[localStorage.getItem("lang") || "es"] || textos.es;
+  safeSet("tablaConceptos", state.conceptos.map(c => `
+    <tr>
+      <td>${c.nombre}</td>
+      <td>${c.frecuencia}</td>
+      <td>
+        <button class="btn btn-sm btn-primary" onclick="openConceptoModal(${c.id})">${t.edit}</button>
+        <button class="btn btn-sm btn-danger" onclick="anular('/conceptos-pago/${c.id}/anular')">${t.annul}</button>
+      </td>
+    </tr>
+  `).join(""));
+}
+
+function renderUltimasObligaciones() {
+  const t = textos[localStorage.getItem("lang") || "es"] || textos.es;
+  safeSet("tablaUltimasObligaciones", state.obligaciones.slice(0,20).map(o => `
+    <tr>
+      <td>${o.codigo || ""} - ${o.propiedad || ""}</td>
+      <td>${o.concepto || ""}</td>
+      <td>${o.mes}/${o.anio}</td>
+      <td>${money(o.monto, o.moneda)}</td>
+      <td>${money(o.saldo, o.moneda)}</td>
+      <td>${o.estado}</td>
+      <td>${o.estado !== "PAGADO" ? `<button class="btn btn-sm btn-primary" onclick="openPagoModal(${o.id})">${t.pay}</button>` : ""}</td>
+    </tr>
+  `).join(""));
+}
+
+function renderMatriz() {
+  const t = textos[localStorage.getItem("lang") || "es"] || textos.es;
+  safeSet("theadMatriz", `
+    <tr>
+      <th>${t.code}</th>
+      <th>${t.property}</th>
+      ${meses.map(m => `<th>${m}</th>`).join("")}
+    </tr>
+  `);
+
+  const grouped = {};
+
+  state.matriz.forEach(r => {
+    const id = r.propiedadId || r.propiedad_id;
+    if (!grouped[id]) grouped[id] = { codigo: r.codigo, propiedad: r.propiedad, meses: {} };
+
+    if (r.obligacionId || r.obligacion_id) {
+      if (!grouped[id].meses[r.mes]) grouped[id].meses[r.mes] = [];
+      grouped[id].meses[r.mes].push(r);
+    }
+  });
+
+  const rows = Object.values(grouped).map(row => {
+    let html = `<tr><td>${row.codigo}</td><td>${row.propiedad}</td>`;
+
+    for (let m = 1; m <= 12; m++) {
+      const obs = row.meses[m] || [];
+      html += `<td>${obs.length ? obs.map(o => {
+        const estado = o.estado;
+        const cls = estado === "PAGADO" ? "cell-pagado" : estado === "PARCIAL" ? "cell-parcial" : "cell-pendiente";
+        const id = o.obligacionId || o.obligacion_id;
+
+        return `
+          <div class="payment-cell ${cls}">
+            <b>${money(o.monto, o.moneda)}</b><br>
+            ${o.concepto}<br>
+            ${estado}<br>
+            ${t.balance}: ${money(o.saldo, o.moneda)}<br>
+            ${estado !== "PAGADO" ? `<button class="btn btn-sm btn-primary mt-1" onclick="openPagoModal(${id})">${t.pay}</button>` : ""}
+          </div>
+        `;
+      }).join("") : "-"}</td>`;
+    }
+
+    return html + "</tr>";
+  }).join("");
+
+  safeSet("tbodyMatriz", rows);
+}
+
+function fillConceptos() {
+  const html = state.conceptos.map(c => `<option value="${c.id}">${c.nombre}</option>`).join("");
+
+  const t = textos[localStorage.getItem("lang") || "es"] || textos.es;
+  if ($("filtroConcepto")) $("filtroConcepto").innerHTML = `<option value="">${t.allConcepts}</option>${html}`;
+  if ($("genConcepto")) $("genConcepto").innerHTML = `<option value="">${t.all}</option>${html}`;
+  if ($("conceptoHistId")) $("conceptoHistId").innerHTML = html;
+}
+
+function fillPropiedades() {
+  const html = state.propiedades.map(p => `<option value="${p.id}">${p.codigo} - ${p.nombre}</option>`).join("");
+
+  const t = textos[localStorage.getItem("lang") || "es"] || textos.es;
+  if ($("genPropiedad")) $("genPropiedad").innerHTML = `<option value="">${t.all}</option>${html}`;
+  if ($("histPropiedad")) $("histPropiedad").innerHTML = html;
+}
+
+function fillPropietarios() {
+  const html = state.propietarios.map(p => `<option value="${p.id}">${p.nombre}</option>`).join("");
+  if ($("propietarioHistId")) $("propietarioHistId").innerHTML = html;
+}
+
+function fillMonedas() {
+  const html = state.monedas.map(m => `<option value="${m.id}">${m.codigo}</option>`).join("");
+
+  if ($("pagoMoneda")) $("pagoMoneda").innerHTML = html;
+  if ($("conceptoHistMoneda")) $("conceptoHistMoneda").innerHTML = html;
+}
+
+function setup() {
+  const years = [2024, 2025, 2026, 2027];
+
+  if ($("filtroAnio")) {
+    $("filtroAnio").innerHTML = years.map(y => `<option ${y === anio() ? "selected" : ""}>${y}</option>`).join("");
+  }
+
+  if ($("genAnio")) {
+    $("genAnio").innerHTML = years.map(y => `<option ${y === anio() ? "selected" : ""}>${y}</option>`).join("");
+  }
+
+  const t = textos[localStorage.getItem("lang") || "es"] || textos.es;
+  const monthOptions = `<option value="">${t.all}</option>` + meses.map((m, i) => `<option value="${i + 1}">${m}</option>`).join("");
+
+  if ($("mesGlobal")) $("mesGlobal").innerHTML = monthOptions;
+  if ($("genMes")) $("genMes").innerHTML = monthOptions;
+}
+
+async function anular(path) {
+  try {
+    const motivo = prompt("Motivo de anulación") || "";
+    await api(path, {
+      method: "PATCH",
+      body: JSON.stringify({ motivo })
+    });
+
+    await initApp();
+    toast("Anulado");
+  } catch(e) {
+    err(e);
+  }
+}
+
+async function anularHist(tipo, id) {
+  const map = {
+    estado: "/propiedades/estados-historial/",
+    propietario: "/propiedades/propietarios-historial/",
+    concepto: "/propiedades/conceptos-historial/"
+  };
+
+  await anular(map[tipo] + id + "/anular");
+}
+
+function goTemporalidad(id) {
+  show("historiales");
+  setTimeout(() => {
+    if ($("histPropiedad")) $("histPropiedad").value = id;
+    loadHistoriales();
+  }, 50);
+}
+
+function openPropiedadModal(id = null) {
+  const p = id ? state.propiedades.find(x => x.id === id) : {};
+
+  $("propiedadId").value = id || "";
+  $("propCodigo").value = p?.codigo || "";
+  $("propNombre").value = p?.nombre || "";
+  $("propTipo").value = p?.tipo || "DEPARTAMENTO";
+  $("propDireccion").value = p?.direccion || "";
+
+  modals.propiedad.show();
+}
+
+async function savePropiedad() {
+  try {
+    const id = $("propiedadId").value;
+
+    const payload = {
+      empresaId: empresaId(),
+      codigo: $("propCodigo").value,
+      nombre: $("propNombre").value,
+      tipo: $("propTipo").value,
+      direccion: $("propDireccion").value
+    };
+
+    await api(id ? `/propiedades/${id}` : "/propiedades", {
+      method: id ? "PUT" : "POST",
+      body: JSON.stringify(payload)
+    });
+
+    modals.propiedad.hide();
+    await loadPropiedades();
+  } catch(e) {
+    err(e);
+  }
+}
+
+function openConceptoModal(id = null) {
+  const c = id ? state.conceptos.find(x => x.id === id) : {};
+
+  $("conceptoId").value = id || "";
+  $("conceptoNombre").value = c?.nombre || "";
+  $("conceptoFrecuencia").value = c?.frecuencia || "MENSUAL";
+
+  modals.concepto.show();
+}
+
+async function saveConcepto() {
+  try {
+    const id = $("conceptoId").value;
+
+    const payload = {
+      empresaId: empresaId(),
+      nombre: $("conceptoNombre").value,
+      frecuencia: $("conceptoFrecuencia").value
+    };
+
+    await api(id ? `/conceptos-pago/${id}` : "/conceptos-pago", {
+      method: id ? "PUT" : "POST",
+      body: JSON.stringify(payload)
+    });
+
+    modals.concepto.hide();
+    await loadConceptos();
+  } catch(e) {
+    err(e);
+  }
+}
+
+function openPropietarioModal(id = null) {
+  const p = id ? state.propietarios.find(x => x.id === id) : {};
+
+  $("propietarioId").value = id || "";
+  $("propietarioNombre").value = p?.nombre || "";
+  $("propietarioDocumento").value = p?.documento || "";
+  $("propietarioTelefono").value = p?.telefono || "";
+  $("propietarioEmail").value = p?.email || "";
+
+  modals.propietario.show();
+}
+
+async function savePropietario() {
+  try {
+    const id = $("propietarioId").value;
+
+    const payload = {
+      empresaId: empresaId(),
+      nombre: $("propietarioNombre").value,
+      documento: $("propietarioDocumento").value,
+      telefono: $("propietarioTelefono").value,
+      email: $("propietarioEmail").value
+    };
+
+    await api(id ? `/propietarios/${id}` : "/propietarios", {
+      method: id ? "PUT" : "POST",
+      body: JSON.stringify(payload)
+    });
+
+    modals.propietario.hide();
+    await loadPropietarios();
+  } catch(e) {
+    err(e);
+  }
+}
+
+function openGenerarModal() {
+  setup();
+  fillPropiedades();
+  fillConceptos();
+
+  if ($("genAnio")) $("genAnio").value = anio();
+  if ($("genMes")) $("genMes").value = mes() || "";
+
+  modals.generar.show();
+}
+
+async function generarObligaciones() {
+  try {
+    const payload = {
+      empresaId: empresaId(),
+      anio: Number($("genAnio").value),
+      mes: $("genMes").value ? Number($("genMes").value) : null,
+      propiedadId: $("genPropiedad").value ? Number($("genPropiedad").value) : null,
+      conceptoId: $("genConcepto").value ? Number($("genConcepto").value) : null
+    };
+
+    const result = await api("/obligaciones/generar", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+
+    modals.generar.hide();
+    await refreshMain();
+
+    toast("Creadas: " + (result.obligacionesCreadas ?? result.obligaciones_creadas ?? 0));
+  } catch(e) {
+    err(e);
+  }
+}
+
+function openPagoModal(id) {
+  const o = state.matriz.find(x => (x.obligacionId || x.obligacion_id) == id)
+        || state.obligaciones.find(x => x.id == id);
+
+  $("pagoObligacionId").value = id;
+  $("pagoMonto").value = o?.saldo || 0;
+  $("pagoFecha").value = new Date().toISOString().substring(0, 10);
+  $("pagoTipoCambio").value = "";
+  $("pagoObs").value = "";
+
+  safeSet("pagoInfo", `
+    ${o?.propiedad || ""}<br>
+    ${o?.concepto || ""}<br>
+    Saldo: ${money(o?.saldo || 0, o?.moneda || "S/")}
+  `);
+
+  modals.pago.show();
+}
+
+async function registrarPago() {
+  try {
+    const payload = {
+      empresaId: empresaId(),
+      obligacionId: Number($("pagoObligacionId").value),
+      usuarioId: session.usuarioId,
+      monto: Number($("pagoMonto").value),
+      monedaId: Number($("pagoMoneda").value),
+      tipoCambioUsado: $("pagoTipoCambio").value ? Number($("pagoTipoCambio").value) : null,
+      fechaPago: $("pagoFecha").value,
+      observacion: $("pagoObs").value
+    };
+
+    await api("/pagos", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+
+    modals.pago.hide();
+    await refreshMain();
+  } catch(e) {
+    err(e);
+  }
+}
+
+function openEstadoModal() {
+  $("estadoHistInicio").value = new Date().toISOString().substring(0, 10);
+  $("estadoHistFin").value = "";
+  $("estadoHistMotivo").value = "";
+  modals.estadoHist.show();
+}
+
+async function saveEstadoHist() {
+  try {
+    const id = $("histPropiedad").value;
+
+    const payload = {
+      empresaId: empresaId(),
+      estado: $("estadoHistEstado").value,
+      fechaInicio: $("estadoHistInicio").value,
+      fechaFin: $("estadoHistFin").value || null,
+      motivo: $("estadoHistMotivo").value
+    };
+
+    await api(`/propiedades/${id}/estados-historial`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+
+    modals.estadoHist.hide();
+    await loadHistoriales();
+  } catch(e) {
+    err(e);
+  }
+}
+
+function openPropietarioHistModal() {
+  $("propietarioHistInicio").value = new Date().toISOString().substring(0, 10);
+  $("propietarioHistFin").value = "";
+  $("propietarioHistPorcentaje").value = 100;
+  modals.propietarioHist.show();
+}
+
+async function savePropietarioHist() {
+  try {
+    const id = $("histPropiedad").value;
+
+    const payload = {
+      empresaId: empresaId(),
+      propietarioId: Number($("propietarioHistId").value),
+      porcentaje: Number($("propietarioHistPorcentaje").value),
+      fechaInicio: $("propietarioHistInicio").value,
+      fechaFin: $("propietarioHistFin").value || null
+    };
+
+    await api(`/propiedades/${id}/propietarios-historial`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+
+    modals.propietarioHist.hide();
+    await loadHistoriales();
+  } catch(e) {
+    err(e);
+  }
+}
+
+function openConceptoHistModal() {
+  $("conceptoHistInicio").value = new Date().toISOString().substring(0, 10);
+  $("conceptoHistFin").value = "";
+  $("conceptoHistMonto").value = "";
+  modals.conceptoHist.show();
+}
+
+async function saveConceptoHist() {
+  try {
+    const id = $("histPropiedad").value;
+
+    const payload = {
+      empresaId: empresaId(),
+      conceptoId: Number($("conceptoHistId").value),
+      monto: Number($("conceptoHistMonto").value),
+      monedaId: Number($("conceptoHistMoneda").value),
+      frecuencia: $("conceptoHistFrecuencia").value,
+      fechaInicio: $("conceptoHistInicio").value,
+      fechaFin: $("conceptoHistFin").value || null
+    };
+
+    await api(`/propiedades/${id}/conceptos-historial`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+
+    modals.conceptoHist.hide();
+    await loadHistoriales();
+  } catch(e) {
+    err(e);
+  }
+}
+
+async function exportarTodo() {
+  try {
+    const tablas = [
+      "propiedades",
+      "propietarios",
+      "conceptos_pago",
+      "obligaciones_pago",
+      "pagos",
+      "propiedad_estado_historial",
+      "propiedad_propietario_historial",
+      "propiedad_concepto_historial"
+    ];
+
+    const wb = XLSX.utils.book_new();
+
+    for (const tabla of tablas) {
+      const data = await api(`/exportar/${tabla}?empresaId=${empresaId()}&anio=${anio()}`);
+      const ws = XLSX.utils.json_to_sheet(data);
+      XLSX.utils.book_append_sheet(wb, ws, tabla.substring(0, 31));
+    }
+
+    XLSX.writeFile(wb, `reporte_empresa_${empresaId()}_${anio()}.xlsx`);
+  } catch(e) {
+    err(e);
+  }
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  modals = {
+    propiedad: new bootstrap.Modal("#modalPropiedad"),
+    concepto: new bootstrap.Modal("#modalConcepto"),
+    propietario: new bootstrap.Modal("#modalPropietario"),
+    generar: new bootstrap.Modal("#modalGenerar"),
+    pago: new bootstrap.Modal("#modalPago"),
+    estadoHist: new bootstrap.Modal("#modalEstadoHist"),
+    propietarioHist: new bootstrap.Modal("#modalPropietarioHist"),
+    conceptoHist: new bootstrap.Modal("#modalConceptoHist")
+  };
+
+  setup();
+  setLang(localStorage.getItem("lang") || "es");
+  showApp();
+});
+</script>
+</body>
+</html>
