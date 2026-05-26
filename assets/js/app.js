@@ -454,6 +454,13 @@ function renderConceptos() {
       <td>${c.nombre}</td>
       <td>${c.frecuencia}</td>
       <td>
+ ${
+   c.es_variable
+   ? "Variable"
+   : "Fijo"
+ }
+</td>
+      <td>
         <button class="btn btn-sm btn-primary" onclick="openConceptoModal(${c.id})">${t.edit}</button>
         <button class="btn btn-sm btn-danger" onclick="anular('/conceptos-pago/${c.id}/anular')">${t.annul}</button>
       </td>
@@ -880,11 +887,18 @@ async function saveConcepto() {
   try {
     const id = $("conceptoId").value;
 
-    const payload = {
-      empresaId: empresaId(),
-      nombre: $("conceptoNombre").value,
-      frecuencia: $("conceptoFrecuencia").value
-    };
+   const payload = {
+  empresaId: empresaId(),
+
+  nombre:
+    $("conceptoNombre").value,
+
+  frecuencia:
+    $("conceptoFrecuencia").value,
+
+  esVariable:
+    $("conceptoEsVariable").value === "true"
+};
 
     await api(id ? `/conceptos-pago/${id}` : "/conceptos-pago", {
       method: id ? "PUT" : "POST",
