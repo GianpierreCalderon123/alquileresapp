@@ -454,13 +454,6 @@ function renderConceptos() {
       <td>${c.nombre}</td>
       <td>${c.frecuencia}</td>
       <td>
- ${
-   c.es_variable
-   ? "Variable"
-   : "Fijo"
- }
-</td>
-      <td>
         <button class="btn btn-sm btn-primary" onclick="openConceptoModal(${c.id})">${t.edit}</button>
         <button class="btn btn-sm btn-danger" onclick="anular('/conceptos-pago/${c.id}/anular')">${t.annul}</button>
       </td>
@@ -577,47 +570,187 @@ function renderReporteIngresos() {
   }
 }
 
+function excelBorder() {
+  return {
+    top: { style: "thin", color: { rgb: "D9D9D9" } },
+    bottom: { style: "thin", color: { rgb: "D9D9D9" } },
+    left: { style: "thin", color: { rgb: "D9D9D9" } },
+    right: { style: "thin", color: { rgb: "D9D9D9" } }
+  };
+}
+
+function excelCell(value, style = {}) {
+  return { v: value, t: typeof value === "number" ? "n" : "s", s: { border: excelBorder(), alignment: { vertical: "center", wrapText: true }, ...style } };
+}
+
+function setRange(ws, range, style) {
+  const decoded = XLSX.utils.decode_range(range);
+  for (let r = decoded.s.r; r <= decoded.e.r; r++) {
+    for (let c = decoded.s.c; c <= decoded.e.c; c++) {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      if (!ws[addr]) ws[addr] = { v: "", t: "s" };
+      ws[addr].s = { ...(ws[addr].s || {}), ...style };
+    }
+  }
+}
+
+function periodoTexto() {
+  const y = anio();
+  const m = mes();
+  return m ? `${y}${String(m).padStart(2, "0")}` : `${y}`;
+}
+
+function conceptoSeleccionadoNombre() {
+  const id = $("filtroConcepto")?.value;
+  if (!id) return "Todos / 全部";
+  return state.conceptos.find(c => String(c.id) === String(id))?.nombre || "Concepto / 项目";
+}
+
 function exportarReporteIngresos() {
-  const rows = meses.map((nombre, index) => {
-    const mesN = index + 1;
-    const item = state.dashboardMensual.find(x => Number(x.mes || x.month || mesN) === mesN) || {};
-    const pagado = Number(item.pagado || item.totalPagado || item.total_pagado || 0);
-    const pendiente = Number(item.pendiente || item.totalPendiente || item.total_pendiente || 0);
-    return {
-      Mes: nombre,
-      "Ingresos pagados": pagado,
-      Pendiente: pendiente,
-      "Total obligaciones": pagado + pendiente
-    };
-  });
-  const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Ingresos");
-  XLSX.writeFile(wb, `reporte_ingresos_${empresaId()}_${anio()}.xlsx`);
+  const ws = {};
+  const border = excelBorder();
+  const cols = 14;
+  const title = `Reporte de Ingresos del periodo ${periodoTexto()} / ${periodoTexto()} 期间收入报表`;
+  const headerStyle = { fill: { fgColor: { rgb: "FFF200" } }, font: { bold: true }, alignment: { horizontal: "center", vertical: "center" }, border };
+  const groupStyle = { fill: { fgColor: { rgb: "A9D18E" } }, font: { bold: true }, alignment: { horizontal: "center", vertical: "center" }, border };
+  const thStyle = { font: { bold: true }, fill: { fgColor: { rgb: "FFFFFF" } }, border, alignment: { vertical: "center" } };
+  const totalStyle = { font: { bold: true }, border, fill: { fgColor: { rgb: "F2F2F2" } } };
+
+  ws["A1"] = excelCell(title, headerStyle);
+  ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: cols - 1 } }];
+
+  const porConcepto = {};
+  state.obligaciones.forEach(o => {
+    const concepto = o.concepto || "Sin concepto / 无项目";
+    if (!porConcepto[concepto]) porConcepto[concepto] = [];
+    const monto = Number(o.monto || 0);
+    const saldo = Number(o.saldo || 0);
+    const pagado = Math.max(0, monto - saldo);
+    if (pagado > 0 || String(o.estado || "").toUpperCase() === "PAGADO") {
+      porConcepto[concepto].push({
+        ingreso: `${o.codigo || ""} ${o.propiedad || ""}`.trim() || "Ingreso",
+        monto: pagado || monto,
+        observacion: `${o.concepto || ""} ${o.mes || ""}/${o.anio || ""}`.trim()
+      });
+    }
+  });
+
+  if (!Object.keys(porConcepto).length) {
+    porConcepto["Ingresos / 收入"] = meses.map((nombre, index) => {
+      const mesN = index + 1;
+      const item = state.dashboardMensual.find(x => Number(x.mes || x.month || mesN) === mesN) || {};
+      const pagado = Number(item.pagado || item.totalPagado || item.total_pagado || 0);
+      return pagado > 0 ? { ingreso: nombre, monto: pagado, observacion: `Mes ${mesN}` } : null;
+    }).filter(Boolean);
+  }
+
+  let row = 2;
+  Object.entries(porConcepto).forEach(([concepto, items]) => {
+    const groupAddr = XLSX.utils.encode_cell({ r: row, c: 0 });
+    ws[groupAddr] = excelCell(`${concepto}`, groupStyle);
+    ws["!merges"].push({ s: { r: row, c: 0 }, e: { r: row, c: cols - 1 } });
+    row++;
+
+    ws[XLSX.utils.encode_cell({ r: row, c: 0 })] = excelCell("Ingreso / 收入", thStyle);
+    ws[XLSX.utils.encode_cell({ r: row, c: 1 })] = excelCell("Monto / 金额", thStyle);
+    ws[XLSX.utils.encode_cell({ r: row, c: 2 })] = excelCell("Observación / 备注", thStyle);
+    for (let c = 3; c < cols; c++) ws[XLSX.utils.encode_cell({ r: row, c })] = excelCell("", thStyle);
+    row++;
+
+    let total = 0;
+    (items.length ? items : [{ ingreso: "-", monto: 0, observacion: "Sin ingresos / 无收入" }]).forEach(item => {
+      total += Number(item.monto || 0);
+      ws[XLSX.utils.encode_cell({ r: row, c: 0 })] = excelCell(item.ingreso);
+      ws[XLSX.utils.encode_cell({ r: row, c: 1 })] = excelCell(Number(item.monto || 0), { numFmt: "#,##0.00" });
+      ws[XLSX.utils.encode_cell({ r: row, c: 2 })] = excelCell(item.observacion || "");
+      for (let c = 3; c < cols; c++) ws[XLSX.utils.encode_cell({ r: row, c })] = excelCell("");
+      row++;
+    });
+
+    ws[XLSX.utils.encode_cell({ r: row, c: 0 })] = excelCell("Total / 合计", totalStyle);
+    ws[XLSX.utils.encode_cell({ r: row, c: 1 })] = excelCell(total, { ...totalStyle, numFmt: "#,##0.00" });
+    for (let c = 2; c < cols; c++) ws[XLSX.utils.encode_cell({ r: row, c })] = excelCell("", totalStyle);
+    row += 2;
+  });
+
+  ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(row, 10), c: cols - 1 } });
+  ws["!cols"] = [
+    { wch: 24 }, { wch: 14 }, { wch: 28 },
+    ...Array(cols - 3).fill({ wch: 12 })
+  ];
+  XLSX.utils.book_append_sheet(wb, ws, "Ingresos 收入");
+  XLSX.writeFile(wb, `reporte_ingresos_${empresaId()}_${periodoTexto()}.xlsx`);
 }
 
 function exportarMatriz() {
-  const rows = [];
-  const grouped = {};
+  const wb = XLSX.utils.book_new();
+  const ws = {};
+  const year = $("filtroAnio")?.value || anio();
+  const concepto = conceptoSeleccionadoNombre();
+  const title = `Reporte matricial de control de pago-${year}-${concepto} / ${year}-${concepto} 付款控制矩阵报表`;
+  const cols = 13;
+  const border = excelBorder();
+  const titleStyle = { fill: { fgColor: { rgb: "FFD966" } }, font: { bold: true }, alignment: { horizontal: "center", vertical: "center" }, border };
+  const headerStyle = { fill: { fgColor: { rgb: "FFFFFF" } }, font: { bold: true }, alignment: { horizontal: "center", vertical: "center" }, border };
+  const paidStyle = { fill: { fgColor: { rgb: "92D050" } }, border, alignment: { horizontal: "center", vertical: "center", wrapText: true } };
+  const pendingStyle = { fill: { fgColor: { rgb: "F8CBAD" } }, border, alignment: { horizontal: "center", vertical: "center", wrapText: true } };
+  const partialStyle = { fill: { fgColor: { rgb: "FFF2CC" } }, border, alignment: { horizontal: "center", vertical: "center", wrapText: true } };
+  const emptyStyle = { fill: { fgColor: { rgb: "FFFFFF" } }, border, alignment: { horizontal: "center", vertical: "center" } };
 
-  state.matriz.forEach(r => {
-    const id = r.propiedadId || r.propiedad_id;
-    if (!grouped[id]) grouped[id] = { Codigo: r.codigo, Propiedad: r.propiedad };
-    const mesNombre = meses[(Number(r.mes) || 1) - 1] || r.mes;
-    const concepto = r.concepto || "";
-    const estado = r.estado || "";
-    const monto = Number(r.monto || 0);
-    const saldo = Number(r.saldo || 0);
-    grouped[id][mesNombre] = [grouped[id][mesNombre], `${concepto} | ${estado} | Monto: ${monto} | Saldo: ${saldo}`]
-      .filter(Boolean)
-      .join("\n");
+  ws["A1"] = excelCell(title, titleStyle);
+  ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: cols - 1 } }];
+  ws["A2"] = excelCell("Propiedad / 物业", headerStyle);
+  meses.forEach((m, i) => {
+    const zh = ["一月","二月","三月","四月","五月","六月","七月","八月","九月","十月","十一月","十二月"][i];
+    ws[XLSX.utils.encode_cell({ r: 1, c: i + 1 })] = excelCell(`${m} / ${zh}`, headerStyle);
   });
 
-  Object.values(grouped).forEach(row => rows.push(row));
-  const ws = XLSX.utils.json_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Matriz pagos");
-  XLSX.writeFile(wb, `matriz_pagos_${empresaId()}_${$("filtroAnio")?.value || anio()}.xlsx`);
+  const grouped = {};
+  state.matriz.forEach(r => {
+    const id = r.propiedadId || r.propiedad_id || r.codigo || r.propiedad;
+    if (!grouped[id]) grouped[id] = { propiedad: `${r.codigo || ""}${r.propiedad ? " - " + r.propiedad : ""}`.trim(), meses: {} };
+    const mesN = Number(r.mes);
+    if (!mesN) return;
+    const monto = Number(r.monto || 0);
+    const saldo = Number(r.saldo || 0);
+    const pagado = Math.max(0, monto - saldo);
+    if (!grouped[id].meses[mesN]) grouped[id].meses[mesN] = { pagado: 0, monto: 0, estados: [] };
+    grouped[id].meses[mesN].pagado += pagado;
+    grouped[id].meses[mesN].monto += monto;
+    grouped[id].meses[mesN].estados.push(String(r.estado || ""));
+  });
+
+  let row = 2;
+  Object.values(grouped).forEach(item => {
+    ws[XLSX.utils.encode_cell({ r: row, c: 0 })] = excelCell(item.propiedad || "-", { border, alignment: { vertical: "center" } });
+    for (let m = 1; m <= 12; m++) {
+      const cell = item.meses[m];
+      const addr = XLSX.utils.encode_cell({ r: row, c: m });
+      if (!cell) {
+        ws[addr] = excelCell("", emptyStyle);
+        continue;
+      }
+      const pagado = Number(cell.pagado || 0);
+      const monto = Number(cell.monto || 0);
+      let style = pendingStyle;
+      if (monto > 0 && pagado >= monto) style = paidStyle;
+      else if (pagado > 0) style = partialStyle;
+      ws[addr] = excelCell(`${pagado}/${monto}`, style);
+    }
+    row++;
+  });
+
+  if (row === 2) {
+    ws["A3"] = excelCell("Sin datos / 无数据", emptyStyle);
+    row = 3;
+  }
+
+  ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: row, c: cols - 1 } });
+  ws["!cols"] = [{ wch: 24 }, ...Array(12).fill({ wch: 14 })];
+  ws["!rows"] = [{ hpt: 20 }, { hpt: 22 }, ...Array(Math.max(row - 2, 1)).fill({ hpt: 28 })];
+  XLSX.utils.book_append_sheet(wb, ws, "Matriz 矩阵");
+  XLSX.writeFile(wb, `matriz_pagos_${empresaId()}_${year}_${concepto.replace(/[\\/:*?"<>|]/g, "_")}.xlsx`);
 }
 
 function openCargaVariableModal() {
@@ -865,20 +998,11 @@ async function savePropiedad() {
 }
 
 function openConceptoModal(id = null) {
-  const c = id
-    ? state.conceptos.find(x => x.id === id)
-    : {};
+  const c = id ? state.conceptos.find(x => x.id === id) : {};
 
   $("conceptoId").value = id || "";
   $("conceptoNombre").value = c?.nombre || "";
-
-  $("conceptoFrecuencia").value =
-    c?.frecuencia || "MENSUAL";
-
-  $("conceptoEsVariable").value =
-    (c?.esVariable || c?.es_variable)
-      ? "true"
-      : "false";
+  $("conceptoFrecuencia").value = c?.frecuencia || "MENSUAL";
 
   modals.concepto.show();
 }
@@ -887,18 +1011,11 @@ async function saveConcepto() {
   try {
     const id = $("conceptoId").value;
 
-   const payload = {
-  empresaId: empresaId(),
-
-  nombre:
-    $("conceptoNombre").value,
-
-  frecuencia:
-    $("conceptoFrecuencia").value,
-
-  esVariable:
-    $("conceptoEsVariable").value === "true"
-};
+    const payload = {
+      empresaId: empresaId(),
+      nombre: $("conceptoNombre").value,
+      frecuencia: $("conceptoFrecuencia").value
+    };
 
     await api(id ? `/conceptos-pago/${id}` : "/conceptos-pago", {
       method: id ? "PUT" : "POST",
