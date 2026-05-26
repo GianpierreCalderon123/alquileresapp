@@ -4,6 +4,7 @@ const meses = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov"
 
 let session = JSON.parse(localStorage.getItem("session") || "null");
 let chart = null;
+let chartIngresos = null;
 let modals = {};
 
 const state = {
@@ -13,7 +14,8 @@ const state = {
   conceptos: [],
   obligaciones: [],
   matriz: [],
-  dashboardMensual: []
+  dashboardMensual: [],
+  cargaVariable: []
 };
 
 const textos = {
@@ -156,11 +158,13 @@ function setLang(lang) {
   setup();
   fillConceptos();
   renderChart();
+  renderReporteIngresos();
   renderPropietarios();
   renderPropiedades();
   renderConceptos();
   renderUltimasObligaciones();
   renderMatriz();
+  renderReporteIngresos();
 }
 
 function api(path, opt = {}) {
@@ -263,6 +267,7 @@ async function refreshMain() {
     loadMatriz(),
     loadDashboardMensual()
   ]);
+  renderReporteIngresos();
 }
 
 async function loadMonedas() {
@@ -326,6 +331,7 @@ async function loadMatriz() {
 
   state.matriz = await api(`/matriz-pagos?${q}`);
   renderMatriz();
+  renderReporteIngresos();
 }
 
 async function loadHistoriales() {
@@ -520,6 +526,220 @@ function renderMatriz() {
   safeSet("tbodyMatriz", rows);
 }
 
+
+function renderReporteIngresos() {
+  const rows = meses.map((nombre, index) => {
+    const mesN = index + 1;
+    const item = state.dashboardMensual.find(x => Number(x.mes || x.month || mesN) === mesN) || {};
+    const pagado = Number(item.pagado || item.totalPagado || item.total_pagado || 0);
+    const pendiente = Number(item.pendiente || item.totalPendiente || item.total_pendiente || 0);
+    return {
+      mes: nombre,
+      pagado,
+      pendiente,
+      total: pagado + pendiente
+    };
+  });
+
+  const total = rows.reduce((sum, r) => sum + r.pagado, 0);
+  safeSet("ingresosTotalAnio", money(total));
+  safeSet("ingresosTotalMeses", `${rows.filter(r => r.pagado > 0).length} meses con ingresos`);
+  safeSet("tablaReporteIngresos", rows.map(r => `
+    <tr>
+      <td>${r.mes}</td>
+      <td>${money(r.pagado)}</td>
+      <td>${money(r.pendiente)}</td>
+      <td>${money(r.total)}</td>
+    </tr>
+  `).join(""));
+
+  if ($("chartIngresos")) {
+    if (chartIngresos) chartIngresos.destroy();
+    chartIngresos = new Chart($("chartIngresos"), {
+      type: "bar",
+      data: {
+        labels: meses,
+        datasets: [{ label: "Ingresos", data: rows.map(r => r.pagado), backgroundColor: "#28936f" }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { position: "bottom" } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
+}
+
+function exportarReporteIngresos() {
+  const rows = meses.map((nombre, index) => {
+    const mesN = index + 1;
+    const item = state.dashboardMensual.find(x => Number(x.mes || x.month || mesN) === mesN) || {};
+    const pagado = Number(item.pagado || item.totalPagado || item.total_pagado || 0);
+    const pendiente = Number(item.pendiente || item.totalPendiente || item.total_pendiente || 0);
+    return {
+      Mes: nombre,
+      "Ingresos pagados": pagado,
+      Pendiente: pendiente,
+      "Total obligaciones": pagado + pendiente
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Ingresos");
+  XLSX.writeFile(wb, `reporte_ingresos_${empresaId()}_${anio()}.xlsx`);
+}
+
+function exportarMatriz() {
+  const rows = [];
+  const grouped = {};
+
+  state.matriz.forEach(r => {
+    const id = r.propiedadId || r.propiedad_id;
+    if (!grouped[id]) grouped[id] = { Codigo: r.codigo, Propiedad: r.propiedad };
+    const mesNombre = meses[(Number(r.mes) || 1) - 1] || r.mes;
+    const concepto = r.concepto || "";
+    const estado = r.estado || "";
+    const monto = Number(r.monto || 0);
+    const saldo = Number(r.saldo || 0);
+    grouped[id][mesNombre] = [grouped[id][mesNombre], `${concepto} | ${estado} | Monto: ${monto} | Saldo: ${saldo}`]
+      .filter(Boolean)
+      .join("\n");
+  });
+
+  Object.values(grouped).forEach(row => rows.push(row));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Matriz pagos");
+  XLSX.writeFile(wb, `matriz_pagos_${empresaId()}_${$("filtroAnio")?.value || anio()}.xlsx`);
+}
+
+function openCargaVariableModal() {
+  setup();
+  fillConceptos();
+  if ($("variableAnio")) $("variableAnio").innerHTML = [2024, 2025, 2026, 2027].map(y => `<option ${y === anio() ? "selected" : ""}>${y}</option>`).join("");
+  if ($("variableConcepto")) $("variableConcepto").innerHTML = state.conceptos.map(c => `<option value="${c.id}">${c.nombre}</option>`).join("");
+  state.cargaVariable = [];
+  renderCargaVariable();
+  modals.cargaVariable.show();
+}
+
+function descargarPlantillaVariable() {
+  const ejemplo = state.propiedades.slice(0, 5).map(p => ({
+    codigo: p.codigo,
+    anio: Number($("variableAnio")?.value || anio()),
+    mes: 1,
+    concepto: state.conceptos.find(c => String(c.id) === String($("variableConcepto")?.value))?.nombre || "AGUA",
+    monto: 0,
+    moneda: "PEN"
+  }));
+  if (!ejemplo.length) ejemplo.push({ codigo: "A-101", anio: anio(), mes: 1, concepto: "AGUA", monto: 0, moneda: "PEN" });
+  const ws = XLSX.utils.json_to_sheet(ejemplo);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Carga variable");
+  XLSX.writeFile(wb, `plantilla_carga_variable_${anio()}.xlsx`);
+}
+
+function leerCargaVariable(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      state.cargaVariable = rows.map((r, i) => normalizarFilaVariable(r, i + 2));
+      renderCargaVariable();
+    } catch (e) {
+      err(e);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function normalizarFilaVariable(r, fila) {
+  const get = (...keys) => keys.map(k => r[k]).find(v => v !== undefined && v !== "") ?? "";
+  const codigo = String(get("codigo", "Código", "CODIGO", "propiedad", "Propiedad")).trim();
+  const conceptoNombre = String(get("concepto", "Concepto")).trim();
+  const monto = Number(get("monto", "Monto", "importe", "Importe"));
+  const mesValor = Number(get("mes", "Mes"));
+  const anioValor = Number(get("anio", "Año", "ANIO")) || Number($("variableAnio")?.value || anio());
+  const monedaCodigo = String(get("moneda", "Moneda") || "PEN").trim().toUpperCase();
+  const propiedad = state.propiedades.find(p => String(p.codigo).trim().toUpperCase() === codigo.toUpperCase());
+  const concepto = conceptoNombre
+    ? state.conceptos.find(c => String(c.nombre).trim().toUpperCase() === conceptoNombre.toUpperCase())
+    : state.conceptos.find(c => String(c.id) === String($("variableConcepto")?.value));
+  const moneda = state.monedas.find(m => String(m.codigo).trim().toUpperCase() === monedaCodigo || String(m.codigo).trim().toUpperCase() === "S/");
+  const errores = [];
+
+  if (!propiedad) errores.push("Propiedad no existe");
+  if (!concepto) errores.push("Concepto no existe");
+  if (!mesValor || mesValor < 1 || mesValor > 12) errores.push("Mes inválido");
+  if (!monto || monto <= 0) errores.push("Monto inválido");
+  if (!moneda) errores.push("Moneda no existe");
+
+  return {
+    fila,
+    codigo,
+    propiedadId: propiedad?.id || null,
+    anio: anioValor,
+    mes: mesValor,
+    conceptoId: concepto?.id || null,
+    concepto: concepto?.nombre || conceptoNombre,
+    monto,
+    monedaId: moneda?.id || null,
+    moneda: moneda?.codigo || monedaCodigo,
+    errores
+  };
+}
+
+function renderCargaVariable() {
+  safeSet("tablaCargaVariable", state.cargaVariable.map(r => `
+    <tr class="${r.errores.length ? "table-danger" : ""}">
+      <td>${r.codigo}</td>
+      <td>${r.anio}</td>
+      <td>${r.mes}</td>
+      <td>${r.concepto}</td>
+      <td>${money(r.monto, r.moneda)}</td>
+      <td>${r.moneda}</td>
+      <td>${r.errores.length ? r.errores.join(", ") : "OK"}</td>
+    </tr>
+  `).join(""));
+}
+
+async function enviarCargaVariable() {
+  try {
+    const validas = state.cargaVariable.filter(r => !r.errores.length);
+    if (!validas.length) throw new Error("No hay filas válidas para cargar.");
+
+    const payload = {
+      empresaId: empresaId(),
+      usuarioId: session.usuarioId,
+      items: validas.map(r => ({
+        propiedadId: r.propiedadId,
+        conceptoId: r.conceptoId,
+        anio: r.anio,
+        mes: r.mes,
+        monto: r.monto,
+        monedaId: r.monedaId
+      }))
+    };
+
+    await api("/obligaciones/variables/masivo", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+
+    modals.cargaVariable.hide();
+    await refreshMain();
+    toast(`Carga variable realizada: ${validas.length} obligaciones`);
+  } catch(e) {
+    err(e);
+  }
+}
+
 function fillConceptos() {
   const html = state.conceptos.map(c => `<option value="${c.id}">${c.nombre}</option>`).join("");
 
@@ -527,6 +747,7 @@ function fillConceptos() {
   if ($("filtroConcepto")) $("filtroConcepto").innerHTML = `<option value="">${t.allConcepts}</option>${html}`;
   if ($("genConcepto")) $("genConcepto").innerHTML = `<option value="">${t.all}</option>${html}`;
   if ($("conceptoHistId")) $("conceptoHistId").innerHTML = html;
+  if ($("variableConcepto")) $("variableConcepto").innerHTML = html;
 }
 
 function fillPropiedades() {
@@ -914,7 +1135,8 @@ window.addEventListener("DOMContentLoaded", () => {
     pago: new bootstrap.Modal("#modalPago"),
     estadoHist: new bootstrap.Modal("#modalEstadoHist"),
     propietarioHist: new bootstrap.Modal("#modalPropietarioHist"),
-    conceptoHist: new bootstrap.Modal("#modalConceptoHist")
+    conceptoHist: new bootstrap.Modal("#modalConceptoHist"),
+    cargaVariable: new bootstrap.Modal("#modalCargaVariable")
   };
 
   setup();
