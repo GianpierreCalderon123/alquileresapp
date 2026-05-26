@@ -1,0 +1,21 @@
+body{background:#f4f6fb;font-family:Arial,sans-serif}
+    .topbar{background:#24466f;color:white;padding:14px 22px}
+    .section{display:none}.section.active{display:block}
+    .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#eef3fb}
+    .login-card{width:420px;border:0;border-radius:18px;box-shadow:0 12px 32px rgba(0,0,0,.12)}
+    .app{display:none}
+    .metric-card{color:white;border-radius:12px;padding:20px}
+    .bg-paid{background:#28936f}.bg-pending{background:#df4f5f}.bg-total{background:#f5a623}
+    .sidebar-button{border:none;background:transparent;color:#24466f;font-weight:600}
+    .table-matrix th{background:#edf1f7;font-size:13px;white-space:nowrap}
+    .payment-cell{min-width:135px;border-radius:8px;padding:8px;font-size:12px}
+    .cell-pagado{background:#d8f3e5;border-left:4px solid #28a745}
+    .cell-pendiente{background:#ffe0e3;border-left:4px solid #dc3545}
+    .cell-parcial{background:#fff2cc;border-left:4px solid #ffc107}
+    .btn-icon{width:32px;height:32px;padding:0}
+    .toast-box{position:fixed;right:20px;bottom:20px;z-index:9999;max-width:420px}
+    .api-pill{font-size:12px;background:#e9eef8;color:#24466f;border-radius:99px;padding:4px 10px}
+    .temporal-card{border:0;border-radius:14px;box-shadow:0 4px 14px rgba(0,0,0,.06)}
+    .temporal-table th{background:#edf1f7;font-size:13px;white-space:nowrap}
+    .temporal-table td{font-size:13px;vertical-align:middle}
+    .badge-soft{background:#eef3fb;color:#24466f;border-radius:999px;padding:4px 8px;font-size:12px}
