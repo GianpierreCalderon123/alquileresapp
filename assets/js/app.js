@@ -858,11 +858,20 @@ async function savePropiedad() {
 }
 
 function openConceptoModal(id = null) {
-  const c = id ? state.conceptos.find(x => x.id === id) : {};
+  const c = id
+    ? state.conceptos.find(x => x.id === id)
+    : {};
 
   $("conceptoId").value = id || "";
   $("conceptoNombre").value = c?.nombre || "";
-  $("conceptoFrecuencia").value = c?.frecuencia || "MENSUAL";
+
+  $("conceptoFrecuencia").value =
+    c?.frecuencia || "MENSUAL";
+
+  $("conceptoEsVariable").value =
+    (c?.esVariable || c?.es_variable)
+      ? "true"
+      : "false";
 
   modals.concepto.show();
 }
