@@ -1107,23 +1107,38 @@ async function generarObligaciones() {
   }
 }
 
-function openPagoModal(id) {
-  const o = state.matriz.find(x => (x.obligacionId || x.obligacion_id) == id)
-        || state.obligaciones.find(x => x.id == id);
+async function openPagoModal(id)
+{
+    const o =
+        state.obligaciones.find(x => x.id == id);
 
-  $("pagoObligacionId").value = id;
-  $("pagoMonto").value = Number(o?.saldo || 0) > 0 ? o.saldo : 0;
-  $("pagoFecha").value = new Date().toISOString().substring(0, 10);
-  $("pagoTipoCambio").value = "";
-  $("pagoObs").value = "";
+    const pago =
+        await api(
+            `/pagos/obligacion/${id}`
+        );
 
-  safeSet("pagoInfo", `
-    ${o?.propiedad || ""}<br>
-    ${o?.concepto || ""}<br>
-    Saldo: ${money(o?.saldo || 0, o?.moneda || "S/")}
-  `);
+    $("pagoObligacionId").value = id;
 
-  modals.pago.show();
+    $("pagoMonto").value =
+        pago?.monto ??
+        o?.saldo ??
+        o?.monto ??
+        0;
+
+    $("pagoFecha").value =
+        pago?.fecha_pago
+            ? pago.fecha_pago.substring(0,10)
+            : new Date()
+                .toISOString()
+                .substring(0,10);
+
+    $("pagoTipoCambio").value =
+        pago?.tipo_cambio_usado ?? "";
+
+    $("pagoObs").value =
+        pago?.observacion ?? "";
+
+    modals.pago.show();
 }
 
 async function registrarPago() {
