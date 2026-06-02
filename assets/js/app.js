@@ -463,6 +463,7 @@ function renderConceptos() {
 
 function renderUltimasObligaciones() {
   const t = textos[localStorage.getItem("lang") || "es"] || textos.es;
+
   safeSet("tablaUltimasObligaciones", state.obligaciones.slice(0,20).map(o => `
     <tr>
       <td>${o.codigo || ""} - ${o.propiedad || ""}</td>
@@ -471,7 +472,11 @@ function renderUltimasObligaciones() {
       <td>${money(o.monto, o.moneda)}</td>
       <td>${money(o.saldo, o.moneda)}</td>
       <td>${o.estado}</td>
-      <td>${o.estado !== "PAGADO" ? `<button class="btn btn-sm btn-primary" onclick="openPagoModal(${o.id})">${t.pay}</button>` : ""}</td>
+      <td>
+        <button class="btn btn-sm btn-primary" onclick="openPagoModal(${o.id})">
+          ${String(o.estado).toUpperCase() === "PAGADO" ? t.edit : t.pay}
+        </button>
+      </td>
     </tr>
   `).join(""));
 }
@@ -1105,7 +1110,7 @@ function openPagoModal(id) {
         || state.obligaciones.find(x => x.id == id);
 
   $("pagoObligacionId").value = id;
-  $("pagoMonto").value = o?.saldo || 0;
+  $("pagoMonto").value = Number(o?.saldo || 0) > 0 ? o.saldo : 0;
   $("pagoFecha").value = new Date().toISOString().substring(0, 10);
   $("pagoTipoCambio").value = "";
   $("pagoObs").value = "";
