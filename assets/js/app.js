@@ -519,7 +519,9 @@ function renderMatriz() {
             ${o.concepto}<br>
             ${estado}<br>
             ${t.balance}: ${money(o.saldo, o.moneda)}<br>
-            ${estado !== "PAGADO" ? `<button class="btn btn-sm btn-primary mt-1" onclick="openPagoModal(${id})">${t.pay}</button>` : ""}
+            <button class="btn btn-sm btn-primary mt-1" onclick="openPagoModal(${id})">
+  ${String(estado).toUpperCase() === "PAGADO" ? t.edit : t.pay}
+</button>
           </div>
         `;
       }).join("") : "-"}</td>`;
