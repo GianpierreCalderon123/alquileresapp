@@ -94,7 +94,9 @@
       <button class="sidebar-button" onclick="show('propiedades')"><i class="bi bi-buildings"></i> <span id="navProperties">Propiedades</span></button>
       <button class="sidebar-button" onclick="show('conceptos')"><i class="bi bi-list-check"></i> <span id="navConcepts">Conceptos</span></button>
       <button class="sidebar-button" onclick="show('pagos')"><i class="bi bi-table"></i> <span id="navPayments">Control de Pagos</span></button>
-      <button class="sidebar-button" onclick="show('reporteIngresos')"><i class="bi bi-cash-coin"></i> <span id="navIncomeReport">Reporte de Ingresos</span></button>
+      <button class="sidebar-button" onclick="show('reportePagos')">
+  <i class="bi bi-receipt"></i> Reporte de Pagos
+</button>
       <button class="sidebar-button" onclick="show('historiales')"><i class="bi bi-clock-history"></i> <span id="navTime">Temporalidad</span></button>
     </div>
 
@@ -255,43 +257,32 @@
     </section>
 
 
-    <section id="reporteIngresos" class="section">
-      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-        <h4 id="titleIncomeReport">Reporte de Ingresos</h4>
-        <button class="btn btn-success" onclick="exportarReporteIngresos()">
-          <i class="bi bi-file-earmark-excel"></i> Exportar ingresos
-        </button>
-      </div>
+    <section id="reportePagos" class="section">
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h4>Reporte de Pagos</h4>
+    <button class="btn btn-success" onclick="exportarReportePagos()">
+      <i class="bi bi-file-earmark-excel"></i> Exportar pagos
+    </button>
+  </div>
 
-      <div class="row g-3 mb-3">
-        <div class="col-md-4">
-          <div class="metric-card bg-paid">
-            <div>Total ingresos del año</div>
-            <h3 id="ingresosTotalAnio">S/ 0.00</h3>
-            <small id="ingresosTotalMeses"></small>
-          </div>
-        </div>
-      </div>
+  <div class="card p-3 table-responsive">
+    <table class="table table-bordered table-sm bg-white">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Pago ID</th>
+          <th>Tipo</th>
+          <th>Monto</th>
+          <th>Moneda</th>
+          <th>Observación</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody id="tablaReportePagos"></tbody>
+    </table>
+  </div>
+</section>
 
-      <div class="card p-3 mb-3">
-        <h6>Ingresos por mes</h6>
-        <canvas id="chartIngresos" height="45"></canvas>
-      </div>
-
-      <div class="card p-3 table-responsive">
-        <table class="table table-bordered table-sm bg-white">
-          <thead>
-            <tr>
-              <th>Mes</th>
-              <th>Ingresos pagados</th>
-              <th>Pendiente</th>
-              <th>Total obligaciones</th>
-            </tr>
-          </thead>
-          <tbody id="tablaReporteIngresos"></tbody>
-        </table>
-      </div>
-    </section>
 
     <section id="historiales" class="section">
       <h4 id="titleTime">Temporalidad</h4>
