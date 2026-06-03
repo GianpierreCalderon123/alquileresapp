@@ -166,7 +166,7 @@ function setLang(lang) {
   renderConceptos();
   renderUltimasObligaciones();
   renderMatriz();
-  renderReporteIngresos();
+  if ($("tablaReportePagos")) loadReportePagos();
 }
 
 function api(path, opt = {}) {
@@ -657,7 +657,15 @@ function renderMatriz() {
     }
   });
 
-  const rows = Object.values(grouped).map(row => {
+  const rows = Object.values(grouped)
+  .sort((a, b) =>
+    String(a.codigo || "").localeCompare(
+      String(b.codigo || ""),
+      "es",
+      { numeric: true }
+    )
+  )
+  .map(row => {
     let html = `
 <tr>
   <td>
