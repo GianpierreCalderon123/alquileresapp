@@ -1118,38 +1118,64 @@ async function generarObligaciones() {
   }
 }
 
-async function openPagoModal(id)
-{
-    const o =
-        state.obligaciones.find(x => x.id == id);
+async function openPagoModal(id) {
+  const o =
+    state.matriz.find(x => (x.obligacionId || x.obligacion_id) == id)
+    || state.obligaciones.find(x => x.id == id);
 
-    const pago =
-        await api(
-            `/pagos/obligacion/${id}`
-        );
+  const pagos = await api(`/pagos/obligacion/${id}`);
 
-    $("pagoObligacionId").value = id;
+  const monto = Number(o?.monto || 0);
+  const saldo = Number(o?.saldo || 0);
+  const pagado = Math.max(0, monto - saldo);
 
-    $("pagoMonto").value =
-        pago?.monto ??
-        o?.saldo ??
-        o?.monto ??
-        0;
+  $("pagoObligacionId").value = id;
+  $("pagoMonto").value = saldo > 0 ? saldo : 0;
+  $("pagoFecha").value = new Date().toISOString().substring(0, 10);
+  $("pagoTipoCambio").value = "";
+  $("pagoObs").value = "";
 
-    $("pagoFecha").value =
-        pago?.fecha_pago
-            ? pago.fecha_pago.substring(0,10)
-            : new Date()
-                .toISOString()
-                .substring(0,10);
+  safeSet("pagoInfo", `
+    <b>${o?.codigo || ""} - ${o?.propiedad || ""}</b><br>
+    ${o?.concepto || ""} ${o?.mes || ""}/${o?.anio || ""}<br>
+    Monto: ${money(monto, o?.moneda || "S/")}<br>
+    Pagado: ${money(pagado, o?.moneda || "S/")}<br>
+    Saldo: ${money(saldo, o?.moneda || "S/")}
+  `);
 
-    $("pagoTipoCambio").value =
-        pago?.tipo_cambio_usado ?? "";
+  safeSet("historialPagos", `
+    <h6>Pagos registrados</h6>
+    ${
+      pagos.length
+        ? `
+          <table class="table table-sm table-bordered">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Monto</th>
+                <th>Moneda</th>
+                <th>Tipo cambio</th>
+                <th>Observación</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${pagos.map(p => `
+                <tr>
+                  <td>${date(p.fecha_pago || p.fechaPago)}</td>
+                  <td>${money(p.monto, p.moneda || o?.moneda || "S/")}</td>
+                  <td>${p.moneda || "-"}</td>
+                  <td>${p.tipo_cambio_usado || p.tipoCambioUsado || "-"}</td>
+                  <td>${p.observacion || "-"}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        `
+        : `<div class="text-muted">Sin pagos registrados.</div>`
+    }
+  `);
 
-    $("pagoObs").value =
-        pago?.observacion ?? "";
-
-    modals.pago.show();
+  modals.pago.show();
 }
 
 async function registrarPago() {
