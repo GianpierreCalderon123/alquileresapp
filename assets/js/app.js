@@ -1143,37 +1143,45 @@ async function openPagoModal(id) {
     Saldo: ${money(saldo, o?.moneda || "S/")}
   `);
 
-  safeSet("historialPagos", `
-    <h6>Pagos registrados</h6>
-    ${
-      pagos.length
-        ? `
-          <table class="table table-sm table-bordered">
-            <thead>
+ safeSet("historialPagos", `
+  <h6>Pagos registrados</h6>
+  ${
+    pagos.length
+      ? `
+        <table class="table table-sm table-bordered">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Monto</th>
+              <th>Moneda</th>
+              <th>Tipo cambio</th>
+              <th>Observación</th>
+              <th>Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${pagos.map(p => `
               <tr>
-                <th>Fecha</th>
-                <th>Monto</th>
-                <th>Moneda</th>
-                <th>Tipo cambio</th>
-                <th>Observación</th>
+                <td>${date(p.fecha_pago || p.fechaPago)}</td>
+                <td>${money(p.monto, p.moneda || o?.moneda || "S/")}</td>
+                <td>${p.moneda || "-"}</td>
+                <td>${p.tipo_cambio_usado || p.tipoCambioUsado || "-"}</td>
+                <td>${p.observacion || "-"}</td>
+                <td>
+                  <button
+                    class="btn btn-sm btn-danger"
+                    onclick="anularPago(${p.id})">
+                    Anular
+                  </button>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              ${pagos.map(p => `
-                <tr>
-                  <td>${date(p.fecha_pago || p.fechaPago)}</td>
-                  <td>${money(p.monto, p.moneda || o?.moneda || "S/")}</td>
-                  <td>${p.moneda || "-"}</td>
-                  <td>${p.tipo_cambio_usado || p.tipoCambioUsado || "-"}</td>
-                  <td>${p.observacion || "-"}</td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-        `
-        : `<div class="text-muted">Sin pagos registrados.</div>`
-    }
-  `);
+            `).join("")}
+          </tbody>
+        </table>
+      `
+      : `<div class="text-muted">Sin pagos registrados.</div>`
+  }
+`);
 
   modals.pago.show();
 }
