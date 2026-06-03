@@ -15,7 +15,9 @@ const state = {
   obligaciones: [],
   matriz: [],
   dashboardMensual: [],
-  cargaVariable: []
+  cargaVariable: [],
+  pagoMultipleDetalle: [],
+pagoMultipleRestante: 0
 };
 
 const textos = {
@@ -495,7 +497,7 @@ function renderMatriz() {
 
   state.matriz.forEach(r => {
     const id = r.propiedadId || r.propiedad_id;
-    if (!grouped[id]) grouped[id] = { codigo: r.codigo, propiedad: r.propiedad, meses: {} };
+    if (!grouped[id]) grouped[id] = { id, codigo: r.codigo, propiedad: r.propiedad, meses: {} };
 
     if (r.obligacionId || r.obligacion_id) {
       if (!grouped[id].meses[r.mes]) grouped[id].meses[r.mes] = [];
@@ -504,7 +506,16 @@ function renderMatriz() {
   });
 
   const rows = Object.values(grouped).map(row => {
-    let html = `<tr><td>${row.codigo}</td><td>${row.propiedad}</td>`;
+    let html = `
+<tr>
+  <td>
+    ${row.codigo}<br>
+    <button class="btn btn-sm btn-info mt-1" onclick="openPagoMultipleModal(${row.id})">
+      <i class="bi bi-cash-stack"></i>
+    </button>
+  </td>
+  <td>${row.propiedad}</td>
+`;
 
     for (let m = 1; m <= 12; m++) {
       const obs = row.meses[m] || [];
@@ -1288,6 +1299,156 @@ async function exportarTodo() {
   }
 }
 
+function openPagoMultipleModal(propiedadId = null) {
+  fillPagoMultiple();
+
+  if (propiedadId) {
+    $("pmPropiedad").value = propiedadId;
+  }
+
+  $("pmMonto").value = "";
+  $("pmTipoCambio").value = "";
+  $("pmFecha").value = new Date().toISOString().substring(0, 10);
+  $("pmObs").value = "";
+
+  state.pagoMultipleDetalle = [];
+  state.pagoMultipleRestante = 0;
+
+  renderPagoMultipleDetalle();
+  modals.pagoMultiple.show();
+}
+
+function fillPagoMultiple() {
+  const propiedadesConSaldo = {};
+
+  state.matriz.forEach(x => {
+    const saldo = Number(x.saldo || 0);
+    if (saldo <= 0) return;
+
+    const id = Number(x.propiedadId || x.propiedad_id);
+    propiedadesConSaldo[id] = `${x.codigo} - ${x.propiedad}`;
+  });
+
+  $("pmPropiedad").innerHTML = Object.entries(propiedadesConSaldo)
+    .map(([id, nombre]) => `<option value="${id}">${nombre}</option>`)
+    .join("");
+
+  $("pmMoneda").innerHTML = state.monedas
+    .map(m => `<option value="${m.id}">${m.codigo}</option>`)
+    .join("");
+}
+
+function calcularDistribucionPagoMultiple() {
+  const propiedadId = Number($("pmPropiedad").value);
+  const montoTotal = Number($("pmMonto").value || 0);
+
+  let restante = montoTotal;
+
+  const obligaciones = state.matriz
+    .filter(x =>
+      Number(x.propiedadId || x.propiedad_id) === propiedadId &&
+      Number(x.saldo || 0) > 0
+    )
+    .sort((a, b) => {
+      const ya = Number(a.anio || 0);
+      const yb = Number(b.anio || 0);
+      const ma = Number(a.mes || 0);
+      const mb = Number(b.mes || 0);
+
+      if (ya !== yb) return ya - yb;
+      return ma - mb;
+    });
+
+  const detalle = [];
+
+  for (const o of obligaciones) {
+    if (restante <= 0) break;
+
+    const saldo = Number(o.saldo || 0);
+    const aplicado = Math.min(saldo, restante);
+
+    detalle.push({
+      obligacionId: Number(o.obligacionId || o.obligacion_id),
+      codigo: o.codigo,
+      propiedad: o.propiedad,
+      concepto: o.concepto,
+      anio: o.anio,
+      mes: o.mes,
+      saldo,
+      monto: Number(aplicado.toFixed(2)),
+      estadoResultado: aplicado >= saldo ? "COMPLETO" : "PARCIAL"
+    });
+
+    restante = Number((restante - aplicado).toFixed(2));
+  }
+
+  state.pagoMultipleDetalle = detalle;
+  state.pagoMultipleRestante = restante;
+
+  renderPagoMultipleDetalle();
+}
+
+function renderPagoMultipleDetalle() {
+  const detalle = state.pagoMultipleDetalle || [];
+  const restante = state.pagoMultipleRestante || 0;
+
+  safeSet("pmDetalle", detalle.map(x => `
+    <tr>
+      <td>${x.codigo}</td>
+      <td>${x.concepto}</td>
+      <td>${x.mes}/${x.anio}</td>
+      <td>${money(x.saldo)}</td>
+      <td>${money(x.monto)}</td>
+      <td>
+        <span class="badge ${x.estadoResultado === "COMPLETO" ? "bg-success" : "bg-warning"}">
+          ${x.estadoResultado}
+        </span>
+      </td>
+    </tr>
+  `).join(""));
+
+  const totalAplicado = detalle.reduce((s, x) => s + Number(x.monto || 0), 0);
+
+  safeSet("pmTotalAplicado", money(totalAplicado));
+  safeSet("pmRestante", money(restante));
+}
+
+async function registrarPagoMultiple() {
+  try {
+    const detalle = state.pagoMultipleDetalle || [];
+
+    if (!detalle.length) {
+      toast("No hay pagos calculados.", "warning");
+      return;
+    }
+
+    const payload = {
+      empresaId: empresaId(),
+      usuarioId: session.usuarioId,
+      monedaId: Number($("pmMoneda").value),
+      tipoCambioUsado: $("pmTipoCambio").value ? Number($("pmTipoCambio").value) : null,
+      fechaPago: $("pmFecha").value,
+      observacion: $("pmObs").value,
+      detalles: detalle.map(x => ({
+        obligacionId: x.obligacionId,
+        monto: x.monto
+      }))
+    };
+
+    await api("/pagos/multiple", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+
+    modals.pagoMultiple.hide();
+    await refreshMain();
+
+    toast("Pago múltiple registrado correctamente.");
+  } catch(e) {
+    err(e);
+  }
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   modals = {
     propiedad: new bootstrap.Modal("#modalPropiedad"),
@@ -1298,7 +1459,8 @@ window.addEventListener("DOMContentLoaded", () => {
     estadoHist: new bootstrap.Modal("#modalEstadoHist"),
     propietarioHist: new bootstrap.Modal("#modalPropietarioHist"),
     conceptoHist: new bootstrap.Modal("#modalConceptoHist"),
-    cargaVariable: new bootstrap.Modal("#modalCargaVariable")
+    cargaVariable: new bootstrap.Modal("#modalCargaVariable"),
+    pagoMultiple: new bootstrap.Modal("#modalPagoMultiple")
   };
 
   setup();
