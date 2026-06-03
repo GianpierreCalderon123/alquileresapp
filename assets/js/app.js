@@ -1475,6 +1475,44 @@ async function registrarPagoMultiple() {
   }
 }
 
+async function anularPago(id) {
+
+  if (!confirm("¿Está seguro de anular este pago?")) {
+    return;
+  }
+
+  const motivo = prompt("Motivo de anulación") || "";
+
+  await api(`/pagos/${id}/anular`, {
+    method: "PATCH",
+    body: JSON.stringify({ motivo })
+  });
+
+  toast("Pago anulado correctamente", "success");
+
+  modals.pago.hide();
+  await refreshMain();
+}
+
+async function anularPagoDetalle(id) {
+
+  if (!confirm("¿Está seguro de anular este detalle de pago?")) {
+    return;
+  }
+
+  const motivo = prompt("Motivo de anulación") || "";
+
+  await api(`/pagos/detalle/${id}/anular`, {
+    method: "PATCH",
+    body: JSON.stringify({ motivo })
+  });
+
+  toast("Detalle anulado correctamente", "success");
+
+  modals.pago.hide();
+  await refreshMain();
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   modals = {
     propiedad: new bootstrap.Modal("#modalPropiedad"),
