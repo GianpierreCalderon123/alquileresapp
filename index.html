@@ -256,33 +256,52 @@
       </div>
     </section>
 
-
-    <section id="reportePagos" class="section">
+<section id="reportePagos" class="section">
   <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-    <h4>Reporte de Pagos</h4>
+    <h4>Reporte de Pagos / 付款报表</h4>
     <button class="btn btn-success" onclick="exportarReportePagos()">
-      <i class="bi bi-file-earmark-excel"></i> Exportar pagos
+      <i class="bi bi-file-earmark-excel"></i> Exportar pagos / 导出付款
     </button>
+  </div>
+
+  <div class="card p-3 mb-3">
+    <div class="row g-2">
+      <div class="col-md-2">
+        <label>Año / 年份</label>
+        <select id="reportePagoAnio" class="form-select" onchange="loadReportePagos()"></select>
+      </div>
+
+      <div class="col-md-2">
+        <label>Mes / 月份</label>
+        <select id="reportePagoMes" class="form-select" onchange="loadReportePagos()"></select>
+      </div>
+
+      <div class="col-md-3">
+        <label>Concepto / 项目</label>
+        <select id="reportePagoConcepto" class="form-select" onchange="loadReportePagos()"></select>
+      </div>
+    </div>
   </div>
 
   <div class="card p-3 table-responsive">
     <table class="table table-bordered table-sm bg-white">
       <thead>
         <tr>
-          <th>Fecha</th>
-          <th>Pago ID</th>
-          <th>Tipo</th>
-          <th>Monto</th>
-          <th>Moneda</th>
-          <th>Observación</th>
-          <th>Estado</th>
+          <th>Fecha / 日期</th>
+          <th>Pago / 付款</th>
+          <th>Tipo / 类型</th>
+          <th>Propiedad / 物业</th>
+          <th>Concepto / 项目</th>
+          <th>Detalles / 明细</th>
+          <th>Monto / 金额</th>
+          <th>Moneda / 货币</th>
+          <th>Observación / 备注</th>
         </tr>
       </thead>
       <tbody id="tablaReportePagos"></tbody>
     </table>
   </div>
 </section>
-
 
     <section id="historiales" class="section">
       <h4 id="titleTime">Temporalidad</h4>
