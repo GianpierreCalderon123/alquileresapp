@@ -1484,8 +1484,7 @@ async function registrarPagoMultiple() {
 }
 
 async function anularPago(id) {
-
-  if (!confirm("¿Está seguro de anular este pago?")) {
+  if (!confirm("¿Está seguro de anular este pago? Si es un pago múltiple, se anularán todos los detalles asociados.")) {
     return;
   }
 
