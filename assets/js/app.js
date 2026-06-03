@@ -269,27 +269,136 @@ async function refreshMain() {
     loadMatriz(),
     loadDashboardMensual()
   ]);
-  await loadReportePagos();
+  if ($("tablaReportePagos")) await loadReportePagos();
 }
 
 async function exportarReportePagos() {
-  const pagos = await api(`/pagos?empresaId=${empresaId()}`);
+  const q = new URLSearchParams({
+    empresaId: empresaId(),
+    anio: $("reportePagoAnio")?.value || anio()
+  });
 
-  const data = pagos.map(p => ({
-    Fecha: date(p.fecha_pago || p.fechaPago),
-    PagoId: p.id,
-    Tipo: p.obligacion_id || p.obligacionId ? "Individual" : "Múltiple",
-    Monto: p.monto,
-    Moneda: p.moneda || "",
-    Observacion: p.observacion || "",
-    Estado: p.anulado ? "ANULADO" : "ACTIVO"
-  }));
+  if ($("reportePagoMes")?.value) {
+    q.set("mes", $("reportePagoMes").value);
+  }
 
-  const ws = XLSX.utils.json_to_sheet(data);
+  if ($("reportePagoConcepto")?.value) {
+    q.set("conceptoId", $("reportePagoConcepto").value);
+  }
+
+  const pagos = await api(`/pagos?${q}`);
+
   const wb = XLSX.utils.book_new();
+  const ws = {};
 
-  XLSX.utils.book_append_sheet(wb, ws, "Reporte Pagos");
-  XLSX.writeFile(wb, `reporte_pagos_${empresaId()}_${anio()}.xlsx`);
+  const border = excelBorder();
+  const cols = 9;
+
+  const year = $("reportePagoAnio")?.value || anio();
+  const month = $("reportePagoMes")?.value
+    ? meses[Number($("reportePagoMes").value) - 1]
+    : "Todos";
+  const concepto = $("reportePagoConcepto")?.value
+    ? state.conceptos.find(c => String(c.id) === String($("reportePagoConcepto").value))?.nombre
+    : "Todos";
+
+  const title =
+    `Reporte de Pagos - ${year} - ${month} - ${concepto} / ${year} - ${month} - ${concepto} 付款报表`;
+
+  const titleStyle = {
+    fill: { fgColor: { rgb: "FFF200" } },
+    font: { bold: true },
+    alignment: { horizontal: "center", vertical: "center" },
+    border
+  };
+
+  const headerStyle = {
+    fill: { fgColor: { rgb: "A9D18E" } },
+    font: { bold: true },
+    alignment: { horizontal: "center", vertical: "center" },
+    border
+  };
+
+  const totalStyle = {
+    font: { bold: true },
+    fill: { fgColor: { rgb: "F2F2F2" } },
+    border
+  };
+
+  ws["A1"] = excelCell(title, titleStyle);
+  ws["!merges"] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: cols - 1 } }
+  ];
+
+  const headers = [
+    "Fecha / 日期",
+    "Pago / 付款",
+    "Tipo / 类型",
+    "Propiedad / 物业",
+    "Concepto / 项目",
+    "Detalles / 明细",
+    "Monto / 金额",
+    "Moneda / 货币",
+    "Observación / 备注"
+  ];
+
+  headers.forEach((h, i) => {
+    ws[XLSX.utils.encode_cell({ r: 2, c: i })] = excelCell(h, headerStyle);
+  });
+
+  let row = 3;
+  let total = 0;
+
+  pagos.forEach(p => {
+    total += Number(p.monto || 0);
+
+    const values = [
+      date(p.fecha_pago || p.fechaPago),
+      `#${p.id}`,
+      p.tipo_pago || p.tipoPago || "-",
+      p.propiedad || "-",
+      p.concepto || "-",
+      p.cantidad_detalles || p.cantidadDetalles || 1,
+      Number(p.monto || 0),
+      p.moneda || "-",
+      p.observacion || "-"
+    ];
+
+    values.forEach((v, c) => {
+      ws[XLSX.utils.encode_cell({ r: row, c })] =
+        excelCell(v, c === 6 ? { numFmt: "#,##0.00" } : {});
+    });
+
+    row++;
+  });
+
+  ws[XLSX.utils.encode_cell({ r: row, c: 0 })] = excelCell("Total / 合计", totalStyle);
+  ws[XLSX.utils.encode_cell({ r: row, c: 6 })] =
+    excelCell(total, { ...totalStyle, numFmt: "#,##0.00" });
+
+  ws["!ref"] = XLSX.utils.encode_range({
+    s: { r: 0, c: 0 },
+    e: { r: row, c: cols - 1 }
+  });
+
+  ws["!cols"] = [
+    { wch: 14 },
+    { wch: 12 },
+    { wch: 14 },
+    { wch: 30 },
+    { wch: 24 },
+    { wch: 12 },
+    { wch: 14 },
+    { wch: 12 },
+    { wch: 35 }
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, "Pagos 付款");
+
+  XLSX.writeFile(
+    wb,
+    `reporte_pagos_${empresaId()}_${year}_${month}.xlsx`
+  );
 }
 
 async function loadMonedas() {
@@ -949,7 +1058,47 @@ function fillConceptos() {
   if ($("genConcepto")) $("genConcepto").innerHTML = `<option value="">${t.all}</option>${html}`;
   if ($("conceptoHistId")) $("conceptoHistId").innerHTML = html;
   if ($("variableConcepto")) $("variableConcepto").innerHTML = html;
+  if ($("reportePagoConcepto")) {
+  $("reportePagoConcepto").innerHTML =
+    `<option value="">Todos / 全部</option>` + html;
 }
+  
+}
+
+
+async function loadReportePagos() {
+  if (!$("tablaReportePagos")) return;
+
+  const q = new URLSearchParams({
+    empresaId: empresaId(),
+    anio: $("reportePagoAnio")?.value || anio()
+  });
+
+  if ($("reportePagoMes")?.value) {
+    q.set("mes", $("reportePagoMes").value);
+  }
+
+  if ($("reportePagoConcepto")?.value) {
+    q.set("conceptoId", $("reportePagoConcepto").value);
+  }
+
+  const pagos = await api(`/pagos?${q}`);
+
+  safeSet("tablaReportePagos", pagos.map(p => `
+    <tr>
+      <td>${date(p.fecha_pago || p.fechaPago)}</td>
+      <td>#${p.id}</td>
+      <td>${p.tipo_pago || p.tipoPago || "-"}</td>
+      <td>${p.propiedad || "-"}</td>
+      <td>${p.concepto || "-"}</td>
+      <td>${p.cantidad_detalles || p.cantidadDetalles || 1}</td>
+      <td>${money(p.monto, p.moneda || "S/")}</td>
+      <td>${p.moneda || "-"}</td>
+      <td>${p.observacion || "-"}</td>
+    </tr>
+  `).join(""));
+}
+
 
 function fillPropiedades() {
   const html = state.propiedades.map(p => `<option value="${p.id}">${p.codigo} - ${p.nombre}</option>`).join("");
