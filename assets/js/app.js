@@ -269,7 +269,27 @@ async function refreshMain() {
     loadMatriz(),
     loadDashboardMensual()
   ]);
-  renderReporteIngresos();
+  await loadReportePagos();
+}
+
+async function exportarReportePagos() {
+  const pagos = await api(`/pagos?empresaId=${empresaId()}`);
+
+  const data = pagos.map(p => ({
+    Fecha: date(p.fecha_pago || p.fechaPago),
+    PagoId: p.id,
+    Tipo: p.obligacion_id || p.obligacionId ? "Individual" : "Múltiple",
+    Monto: p.monto,
+    Moneda: p.moneda || "",
+    Observacion: p.observacion || "",
+    Estado: p.anulado ? "ANULADO" : "ACTIVO"
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(wb, ws, "Reporte Pagos");
+  XLSX.writeFile(wb, `reporte_pagos_${empresaId()}_${anio()}.xlsx`);
 }
 
 async function loadMonedas() {
@@ -284,7 +304,8 @@ async function loadPropietarios() {
 }
 
 async function loadPropiedades() {
-  state.propiedades = await api(`/propiedades?empresaId=${empresaId()}`);
+  state.propiedades = (await api(`/propiedades?empresaId=${empresaId()}`))
+  .sort((a,b) => String(a.codigo).localeCompare(String(b.codigo), "es", { numeric:true }));
   renderPropiedades();
   fillPropiedades();
 }
@@ -322,6 +343,27 @@ async function loadObligaciones() {
   renderUltimasObligaciones();
 }
 
+async function loadReportePagos() {
+  const pagos = await api(`/pagos?empresaId=${empresaId()}`);
+
+  safeSet("tablaReportePagos", pagos.map(p => `
+    <tr>
+      <td>${date(p.fecha_pago || p.fechaPago)}</td>
+      <td>${p.id}</td>
+      <td>${p.obligacion_id || p.obligacionId ? "Individual" : "Múltiple"}</td>
+      <td>${money(p.monto, p.moneda || "S/")}</td>
+      <td>${p.moneda || "-"}</td>
+      <td>${p.observacion || "-"}</td>
+      <td>${p.anulado ? "ANULADO" : "ACTIVO"}</td>
+    </tr>
+  `).join(""));
+}
+
+
+
+
+
+
 async function loadMatriz() {
   const q = new URLSearchParams({
     empresaId: empresaId(),
@@ -331,7 +373,8 @@ async function loadMatriz() {
   if ($("filtroConcepto")?.value) q.set("conceptoId", $("filtroConcepto").value);
   if ($("filtroEstado")?.value) q.set("estado", $("filtroEstado").value);
 
-  state.matriz = await api(`/matriz-pagos?${q}`);
+  state.matriz = (await api(`/matriz-pagos?${q}`))
+  .sort((a,b) => String(a.codigo).localeCompare(String(b.codigo), "es", { numeric:true }));
   renderMatriz();
   renderReporteIngresos();
 }
