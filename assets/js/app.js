@@ -1136,6 +1136,15 @@ function setup() {
 
   if ($("mesGlobal")) $("mesGlobal").innerHTML = monthOptions;
   if ($("genMes")) $("genMes").innerHTML = monthOptions;
+
+  if ($("reportePagoAnio")) {
+  $("reportePagoAnio").innerHTML =
+    years.map(y => `<option ${y === anio() ? "selected" : ""}>${y}</option>`).join("");
+}
+
+if ($("reportePagoMes")) {
+  $("reportePagoMes").innerHTML = monthOptions;
+}
 }
 
 async function anular(path) {
