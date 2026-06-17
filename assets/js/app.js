@@ -1415,6 +1415,8 @@ async function openPagoModal(id) {
               <th>Moneda</th>
               <th>Tipo cambio</th>
               <th>Observación</th>
+              <th>Recibo</th>
+              <th>Boleta/Factura</th>
               <th>Acción</th>
             </tr>
           </thead>
@@ -1426,6 +1428,8 @@ async function openPagoModal(id) {
                 <td>${p.moneda || "-"}</td>
                 <td>${p.tipo_cambio_usado || p.tipoCambioUsado || "-"}</td>
                 <td>${p.observacion || "-"}</td>
+                <td>${p.recibo || "-"}</td>
+                <td>${p.boleta_factura || p.boletaFactura || "-"}</td>
                 <td>
   <button
     class="btn btn-sm btn-warning"
