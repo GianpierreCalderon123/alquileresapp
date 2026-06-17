@@ -1674,26 +1674,15 @@ function fillPagoMultiple() {
     .join("");
 }
 
-function calcularDistribucionPagoMultiple() {
+async function calcularDistribucionPagoMultiple() {
   const propiedadId = Number($("pmPropiedad").value);
   const montoTotal = Number($("pmMonto").value || 0);
 
   let restante = montoTotal;
 
-  const obligaciones = state.matriz
-    .filter(x =>
-      Number(x.propiedadId || x.propiedad_id) === propiedadId &&
-      Number(x.saldo || 0) > 0
-    )
-    .sort((a, b) => {
-      const ya = Number(a.anio || 0);
-      const yb = Number(b.anio || 0);
-      const ma = Number(a.mes || 0);
-      const mb = Number(b.mes || 0);
-
-      if (ya !== yb) return ya - yb;
-      return ma - mb;
-    });
+  const obligaciones = await api(
+  `/obligaciones/pendientes-propiedad?empresaId=${empresaId()}&propiedadId=${propiedadId}&hastaAnio=${anio()}`
+);
 
   const detalle = [];
 
