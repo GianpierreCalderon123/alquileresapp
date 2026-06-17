@@ -1755,7 +1755,7 @@ async function registrarPagoMultiple() {
       fechaPago: $("pmFecha").value,
       observacion: $("pmObs").value,
       recibo: $("pmRecibo").value,
-      boletafactura: $("pmBoletaFactura").value
+      boletafactura: $("pmBoletaFactura").value,
       detalles: detalle.map(x => ({
         obligacionId: x.obligacionId,
         monto: x.monto
