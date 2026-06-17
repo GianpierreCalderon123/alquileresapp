@@ -1748,19 +1748,19 @@ async function registrarPagoMultiple() {
     }
 
     const payload = {
-      empresaId: empresaId(),
-      usuarioId: session.usuarioId,
-      monedaId: Number($("pmMoneda").value),
-      tipoCambioUsado: $("pmTipoCambio").value ? Number($("pmTipoCambio").value) : null,
-      fechaPago: $("pmFecha").value,
-      observacion: $("pmObs").value,
-      recibo: $("pmRecibo").value,
-      boletafactura: $("pmBoletaFactura").value,
-      detalles: detalle.map(x => ({
-        obligacionId: x.obligacionId,
-        monto: x.monto
-      }))
-    };
+  empresaId: empresaId(),
+  usuarioId: session.usuarioId,
+  monedaId: Number($("pmMoneda").value),
+  tipoCambioUsado: $("pmTipoCambio").value ? Number($("pmTipoCambio").value) : null,
+  fechaPago: $("pmFecha").value,
+  observacion: $("pmObs").value,
+  recibo: $("pmRecibo").value,
+  boletaFactura: $("pmBoletaFactura").value,
+  detalles: detalle.map(x => ({
+    obligacionId: x.obligacionId,
+    monto: x.monto
+  }))
+};
 
     await api("/pagos/multiple", {
       method: "POST",
