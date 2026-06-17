@@ -575,6 +575,7 @@ function renderPropietarios() {
       <td>${p.documento || "-"}</td>
       <td>${p.telefono || "-"}</td>
       <td>${p.email || "-"}</td>
+      <td>${p.ultima_propiedad || p.ultimaPropiedad || "-"}</td>
       <td>
         <button class="btn btn-sm btn-primary" onclick="openPropietarioModal(${p.id})">${t.edit}</button>
         <button class="btn btn-sm btn-danger" onclick="anular('/propietarios/${p.id}/anular')">${t.annul}</button>
@@ -591,6 +592,7 @@ function renderPropiedades() {
       <td>${p.nombre}</td>
       <td>${p.tipo}</td>
       <td>${p.direccion || "-"}</td>
+      <td>${p.propietario_actual || p.propietarioActual || "-"}</td>
       <td>${p.estado_actual || p.estadoActual || "-"}</td>
       <td>
         <button class="btn btn-sm btn-primary" onclick="openPropiedadModal(${p.id})">${t.edit}</button>
