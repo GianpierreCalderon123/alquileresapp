@@ -161,6 +161,11 @@
         <button class="btn btn-primary" onclick="openPropietarioModal()" id="btnNewOwner">Nuevo</button>
       </div>
 
+      <input id="buscarPropietarios" class="form-control mb-2"
+       placeholder="Buscar propietario, documento o propiedad"
+       oninput="renderPropietarios()">
+
+      
       <table class="table table-bordered bg-white">
         <thead>
           <tr>
@@ -182,6 +187,10 @@
         <button class="btn btn-primary" onclick="openPropiedadModal()" id="btnNewProperty">Nueva</button>
       </div>
 
+      <input id="buscarPropiedades" class="form-control mb-2"
+       placeholder="Buscar código, propiedad o propietario"
+       oninput="renderPropiedades()">
+      
       <table class="table table-bordered bg-white">
         <thead>
           <tr>
@@ -251,6 +260,10 @@
         </div>
       </div>
 
+<input id="buscarMatriz" class="form-control mb-2"
+       placeholder="Buscar código, propiedad o propietario"
+       oninput="renderMatriz()">
+      
       <div class="card p-3 table-responsive">
         <table class="table table-bordered table-matrix">
           <thead id="theadMatriz"></thead>
