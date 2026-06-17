@@ -651,7 +651,15 @@ function renderMatriz() {
 
   state.matriz.forEach(r => {
     const id = r.propiedadId || r.propiedad_id;
-    if (!grouped[id]) grouped[id] = { id, codigo: r.codigo, propiedad: r.propiedad, meses: {} };
+    if (!grouped[id]) {
+  grouped[id] = {
+    id,
+    codigo: r.codigo,
+    propiedad: r.propiedad,
+    propietarioActual: r.propietario_actual || r.propietarioActual || "-",
+    meses: {}
+  };
+}
 
     if (r.obligacionId || r.obligacion_id) {
       if (!grouped[id].meses[r.mes]) grouped[id].meses[r.mes] = [];
@@ -676,7 +684,10 @@ function renderMatriz() {
       <i class="bi bi-cash-stack"></i>
     </button>
   </td>
-  <td>${row.propiedad}</td>
+  <td>
+  ${row.propiedad}<br>
+  <small class="text-muted">${row.propietarioActual}</small>
+</td>
 `;
 
     for (let m = 1; m <= 12; m++) {
