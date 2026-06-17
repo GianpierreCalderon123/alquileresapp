@@ -1427,12 +1427,24 @@ async function openPagoModal(id) {
                 <td>${p.tipo_cambio_usado || p.tipoCambioUsado || "-"}</td>
                 <td>${p.observacion || "-"}</td>
                 <td>
-                  <button
-                    class="btn btn-sm btn-danger"
-                    onclick="anularPago(${p.id})">
-                    Anular
-                  </button>
-                </td>
+  <button
+    class="btn btn-sm btn-warning"
+    onclick="editarDatosPago(
+      ${p.id},
+      '${date(p.fecha_pago || p.fechaPago)}',
+      '${(p.observacion || "").replace(/'/g,"\\'")}',
+      '${(p.recibo || "").replace(/'/g,"\\'")}',
+      '${(p.boleta_factura || p.boletaFactura || "").replace(/'/g,"\\'")}'
+    )">
+    Editar
+  </button>
+
+  <button
+    class="btn btn-sm btn-danger"
+    onclick="anularPago(${p.id})">
+    Anular
+  </button>
+</td>
               </tr>
             `).join("")}
           </tbody>
@@ -1445,6 +1457,35 @@ async function openPagoModal(id) {
   modals.pago.show();
 }
 
+async function editarDatosPago(id, fecha, observacion, recibo, boletafactura) {
+  const nuevaFecha = prompt("Fecha de pago", fecha || "");
+  if (nuevaFecha === null) return;
+
+  const nuevaObs = prompt("Observación", observacion || "");
+  if (nuevaObs === null) return;
+
+  const nuevoRecibo = prompt("Recibo", recibo || "");
+  if (nuevoRecibo === null) return;
+
+  const nuevoBoletaFactura = prompt("BoletaFactura", boletafactura || "");
+  if (nuevoBoletaFactura === null) return;
+
+  await api(`/pagos/${id}/datos`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      fechaPago: nuevaFecha,
+      observacion: nuevaObs,
+      recibo: nuevoRecibo,
+      boletafactura: nuevoBoletaFactura
+    })
+  });
+
+  toast("Datos del pago actualizados", "success");
+
+  modals.pago.hide();
+  await refreshMain();
+}
+
 async function registrarPago() {
   try {
     const payload = {
@@ -1455,7 +1496,9 @@ async function registrarPago() {
       monedaId: Number($("pagoMoneda").value),
       tipoCambioUsado: $("pagoTipoCambio").value ? Number($("pagoTipoCambio").value) : null,
       fechaPago: $("pagoFecha").value,
-      observacion: $("pagoObs").value
+      observacion: $("pagoObs").value,
+      recibo: $("pagoRecibo").value,
+      boletafactura: $("pagoBoletaFactura").value
     };
 
     await api("/pagos", {
@@ -1722,6 +1765,8 @@ async function registrarPagoMultiple() {
       tipoCambioUsado: $("pmTipoCambio").value ? Number($("pmTipoCambio").value) : null,
       fechaPago: $("pmFecha").value,
       observacion: $("pmObs").value,
+      recibo: $("pmRecibo").value,
+      boletafactura: $("pmBoletaFactura").value
       detalles: detalle.map(x => ({
         obligacionId: x.obligacionId,
         monto: x.monto
