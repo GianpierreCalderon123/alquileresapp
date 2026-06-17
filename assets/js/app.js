@@ -1418,6 +1418,8 @@ async function openPagoModal(id) {
   $("pagoFecha").value = new Date().toISOString().substring(0, 10);
   $("pagoTipoCambio").value = "";
   $("pagoObs").value = "";
+  $("pagoRecibo").value = "";
+$("pagoBoletaFactura").value = "";
 
   safeSet("pagoInfo", `
     <b>${o?.codigo || ""} - ${o?.propiedad || ""}</b><br>
