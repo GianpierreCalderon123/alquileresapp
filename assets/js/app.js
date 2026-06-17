@@ -740,6 +740,9 @@ function renderMatriz() {
               <b>${money(o.monto, o.moneda)}</b><br>
               ${o.concepto}<br>
               ${estado}<br>
+              ${o.recibo ? `Recibo: ${o.recibo}<br>` : ""}
+              ${(o.boleta_factura || o.boletaFactura) ? `Boleta/Factura: ${o.boleta_factura || o.boletaFactura}<br>` : ""}
+              ${(o.observacion_pago || o.observacionPago) ? `<small>${o.observacion_pago || o.observacionPago}</small><br>` : ""}
               ${t.balance}: ${money(o.saldo, o.moneda)}<br>
               <button class="btn btn-sm btn-primary mt-1" onclick="openPagoModal(${id})">
                 ${String(estado).toUpperCase() === "PAGADO" ? "Ver pagos" : t.pay}
