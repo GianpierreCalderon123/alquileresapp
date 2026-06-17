@@ -1429,6 +1429,7 @@ $("pagoBoletaFactura").value = "";
     Saldo: ${money(saldo, o?.moneda || "S/")}
   `);
 
+  console.log(JSON.stringify(pagos, null, 2));
  safeSet("historialPagos", `
   <h6>Pagos registrados</h6>
   ${
