@@ -735,20 +735,20 @@ function renderMatriz() {
 
           const id = o.obligacionId || o.obligacion_id;
 
-          return `
-            <div class="payment-cell ${cls}">
-              <b>${money(o.monto, o.moneda)}</b><br>
-              ${o.concepto}<br>
-              ${estado}<br>
-              ${o.recibo ? `Recibo: ${o.recibo}<br>` : ""}
-              ${(o.boleta_factura || o.boletaFactura) ? `Boleta/Factura: ${o.boleta_factura || o.boletaFactura}<br>` : ""}
-              ${(o.observacion_pago || o.observacionPago) ? `<small>${o.observacion_pago || o.observacionPago}</small><br>` : ""}
-              ${t.balance}: ${money(o.saldo, o.moneda)}<br>
-              <button class="btn btn-sm btn-primary mt-1" onclick="openPagoModal(${id})">
-                ${String(estado).toUpperCase() === "PAGADO" ? "Ver pagos" : t.pay}
-              </button>
-            </div>
-          `;
+         return `
+  <div class="payment-cell ${cls}">
+    <b>${money(o.monto, o.moneda)}</b><br>
+    ${o.concepto}<br>
+    ${estado}<br>
+    ${o.recibo ? `Recibo: ${o.recibo}<br>` : ""}
+    ${(o.boleta_factura || o.boletaFactura) ? `Boleta/Factura: ${o.boleta_factura || o.boletaFactura}<br>` : ""}
+    ${(o.observacion_pago || o.observacionPago) ? `<small>${o.observacion_pago || o.observacionPago}</small><br>` : ""}
+    ${t.balance}: ${money(o.saldo, o.moneda)}<br>
+    <button class="btn btn-sm btn-primary mt-1" onclick="openPagoModal(${id})">
+      ${String(estado).toUpperCase() === "PAGADO" ? "Ver pagos" : t.pay}
+    </button>
+  </div>
+`;
         }).join("") : "-"}</td>`;
       }
 
@@ -1410,52 +1410,50 @@ async function openPagoModal(id) {
   ${
     pagos.length
       ? `
-        <table class="table table-sm table-bordered">
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Monto</th>
-              <th>Moneda</th>
-              <th>Tipo cambio</th>
-              <th>Observación</th>
-              <th>Recibo</th>
-              <th>Boleta/Factura</th>
-              <th>Acción</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${pagos.map(p => `
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered align-middle">
+            <thead>
               <tr>
-                <td>${date(p.fecha_pago || p.fechaPago)}</td>
-                <td>${money(p.monto, p.moneda || o?.moneda || "S/")}</td>
-                <td>${p.moneda || "-"}</td>
-                <td>${p.tipo_cambio_usado || p.tipoCambioUsado || "-"}</td>
-                <td>${p.observacion || "-"}</td>
-                <td>${p.recibo || "-"}</td>
-                <td>${p.boleta_factura || p.boletaFactura || "-"}</td>
-                <td>
-  <button
-    class="btn btn-sm btn-warning"
-    onclick="editarDatosPago(
-      ${p.id},
-      '${date(p.fecha_pago || p.fechaPago)}',
-      '${(p.observacion || "").replace(/'/g,"\\'")}',
-      '${(p.recibo || "").replace(/'/g,"\\'")}',
-      '${(p.boleta_factura || p.boletaFactura || "").replace(/'/g,"\\'")}'
-    )">
-    Editar
-  </button>
-
-  <button
-    class="btn btn-sm btn-danger"
-    onclick="anularPago(${p.id})">
-    Anular
-  </button>
-</td>
+                <th>Fecha</th>
+                <th>Monto</th>
+                <th>Moneda</th>
+                <th>T.C.</th>
+                <th>Observación</th>
+                <th>Recibo</th>
+                <th>Boleta/Factura</th>
+                <th>Acción</th>
               </tr>
-            `).join("")}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              ${pagos.map(p => `
+                <tr>
+                  <td>${date(p.fecha_pago || p.fechaPago)}</td>
+                  <td>${money(p.monto, p.moneda || o?.moneda || "S/")}</td>
+                  <td>${p.moneda || "-"}</td>
+                  <td>${p.tipo_cambio_usado || p.tipoCambioUsado || "-"}</td>
+                  <td style="min-width:140px">${p.observacion || "-"}</td>
+                  <td>${p.recibo || "-"}</td>
+                  <td>${p.boleta_factura || p.boletaFactura || "-"}</td>
+                  <td style="white-space:nowrap">
+                    <button class="btn btn-sm btn-warning"
+                      onclick="editarDatosPago(
+                        ${p.id},
+                        '${date(p.fecha_pago || p.fechaPago)}',
+                        '${(p.observacion || "").replace(/'/g,"\\'")}',
+                        '${(p.recibo || "").replace(/'/g,"\\'")}',
+                        '${(p.boleta_factura || p.boletaFactura || "").replace(/'/g,"\\'")}'
+                      )">
+                      Editar
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="anularPago(${p.id})">
+                      Anular
+                    </button>
+                  </td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
       `
       : `<div class="text-muted">Sin pagos registrados.</div>`
   }
