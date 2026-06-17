@@ -569,7 +569,15 @@ function renderChart() {
 
 function renderPropietarios() {
   const t = textos[localStorage.getItem("lang") || "es"] || textos.es;
-  safeSet("tablaPropietarios", state.propietarios.map(p => `
+  const q = ($("buscarPropietarios")?.value || "").toLowerCase().trim();
+
+  const data = state.propietarios.filter(p =>
+    `${p.nombre || ""} ${p.documento || ""} ${p.telefono || ""} ${p.email || ""} ${p.ultima_propiedad || p.ultimaPropiedad || ""}`
+      .toLowerCase()
+      .includes(q)
+  );
+
+  safeSet("tablaPropietarios", data.map(p => `
     <tr>
       <td>${p.nombre}</td>
       <td>${p.documento || "-"}</td>
@@ -586,7 +594,15 @@ function renderPropietarios() {
 
 function renderPropiedades() {
   const t = textos[localStorage.getItem("lang") || "es"] || textos.es;
-  safeSet("tablaPropiedades", state.propiedades.map(p => `
+  const q = ($("buscarPropiedades")?.value || "").toLowerCase().trim();
+
+  const data = state.propiedades.filter(p =>
+    `${p.codigo || ""} ${p.nombre || ""} ${p.tipo || ""} ${p.direccion || ""} ${p.propietario_actual || p.propietarioActual || ""} ${p.estado_actual || p.estadoActual || ""}`
+      .toLowerCase()
+      .includes(q)
+  );
+
+  safeSet("tablaPropiedades", data.map(p => `
     <tr>
       <td>${p.codigo}</td>
       <td>${p.nombre}</td>
@@ -639,6 +655,8 @@ function renderUltimasObligaciones() {
 
 function renderMatriz() {
   const t = textos[localStorage.getItem("lang") || "es"] || textos.es;
+  const q = ($("buscarMatriz")?.value || "").toLowerCase().trim();
+
   safeSet("theadMatriz", `
     <tr>
       <th>${t.code}</th>
@@ -651,15 +669,17 @@ function renderMatriz() {
 
   state.matriz.forEach(r => {
     const id = r.propiedadId || r.propiedad_id;
+
     if (!grouped[id]) {
-  grouped[id] = {
-    id,
-    codigo: r.codigo,
-    propiedad: r.propiedad,
-    propietarioActual: r.propietario_actual || r.propietarioActual || "-",
-    meses: {}
-  };
-}
+      grouped[id] = {
+        id,
+        codigo: r.codigo,
+        propiedad: r.propiedad,
+        propietarioActual: r.propietario_actual || r.propietarioActual || "-",
+        tipo: r.tipo || "",
+        meses: {}
+      };
+    }
 
     if (r.obligacionId || r.obligacion_id) {
       if (!grouped[id].meses[r.mes]) grouped[id].meses[r.mes] = [];
@@ -668,15 +688,20 @@ function renderMatriz() {
   });
 
   const rows = Object.values(grouped)
-  .sort((a, b) =>
-    String(a.codigo || "").localeCompare(
-      String(b.codigo || ""),
-      "es",
-      { numeric: true }
+    .filter(row =>
+      `${row.codigo || ""} ${row.propiedad || ""} ${row.propietarioActual || ""} ${row.tipo || ""}`
+        .toLowerCase()
+        .includes(q)
     )
-  )
-  .map(row => {
-    let html = `
+    .sort((a, b) =>
+      String(a.codigo || "").localeCompare(
+        String(b.codigo || ""),
+        "es",
+        { numeric: true }
+      )
+    )
+    .map(row => {
+      let html = `
 <tr>
   <td>
     ${row.codigo}<br>
@@ -685,38 +710,44 @@ function renderMatriz() {
     </button>
   </td>
   <td>
-  ${row.propiedad}<br>
-  <small class="text-muted">${row.propietarioActual}</small>
-</td>
+    ${row.propiedad}<br>
+    <small class="text-muted">${row.propietarioActual}</small>
+  </td>
 `;
 
-    for (let m = 1; m <= 12; m++) {
-      const obs = row.meses[m] || [];
-      html += `<td>${obs.length ? obs.map(o => {
-        const estado = o.estado;
-        const cls = estado === "PAGADO" ? "cell-pagado" : estado === "PARCIAL" ? "cell-parcial" : "cell-pendiente";
-        const id = o.obligacionId || o.obligacion_id;
+      for (let m = 1; m <= 12; m++) {
+        const obs = row.meses[m] || [];
 
-        return `
-          <div class="payment-cell ${cls}">
-            <b>${money(o.monto, o.moneda)}</b><br>
-            ${o.concepto}<br>
-            ${estado}<br>
-            ${t.balance}: ${money(o.saldo, o.moneda)}<br>
-            <button class="btn btn-sm btn-primary mt-1" onclick="openPagoModal(${id})">
-  ${String(estado).toUpperCase() === "PAGADO" ? "Ver pagos" : t.pay}
-</button>
-          </div>
-        `;
-      }).join("") : "-"}</td>`;
-    }
+        html += `<td>${obs.length ? obs.map(o => {
+          const estado = o.estado;
+          const cls =
+            estado === "PAGADO"
+              ? "cell-pagado"
+              : estado === "PARCIAL"
+                ? "cell-parcial"
+                : "cell-pendiente";
 
-    return html + "</tr>";
-  }).join("");
+          const id = o.obligacionId || o.obligacion_id;
+
+          return `
+            <div class="payment-cell ${cls}">
+              <b>${money(o.monto, o.moneda)}</b><br>
+              ${o.concepto}<br>
+              ${estado}<br>
+              ${t.balance}: ${money(o.saldo, o.moneda)}<br>
+              <button class="btn btn-sm btn-primary mt-1" onclick="openPagoModal(${id})">
+                ${String(estado).toUpperCase() === "PAGADO" ? "Ver pagos" : t.pay}
+              </button>
+            </div>
+          `;
+        }).join("") : "-"}</td>`;
+      }
+
+      return html + "</tr>";
+    }).join("");
 
   safeSet("tbodyMatriz", rows);
 }
-
 
 function renderReporteIngresos() {
   const rows = meses.map((nombre, index) => {
