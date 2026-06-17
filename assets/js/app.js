@@ -735,19 +735,41 @@ function renderMatriz() {
 
           const id = o.obligacionId || o.obligacion_id;
 
-         return `
-  <div class="payment-cell ${cls}">
-    <b>${money(o.monto, o.moneda)}</b><br>
-    ${o.concepto}<br>
-    ${estado}<br>
-    ${o.recibo ? `Recibo: ${o.recibo}<br>` : ""}
-    ${(o.boleta_factura || o.boletaFactura) ? `Boleta/Factura: ${o.boleta_factura || o.boletaFactura}<br>` : ""}
-    ${(o.observacion_pago || o.observacionPago) ? `<small>${o.observacion_pago || o.observacionPago}</small><br>` : ""}
-    ${t.balance}: ${money(o.saldo, o.moneda)}<br>
-    <button class="btn btn-sm btn-primary mt-1" onclick="openPagoModal(${id})">
-      ${String(estado).toUpperCase() === "PAGADO" ? "Ver pagos" : t.pay}
-    </button>
-  </div>
+        return `
+<div class="payment-cell ${cls}">
+  <b>${money(o.monto, o.moneda)}</b><br>
+  ${o.concepto}<br>
+  ${estado}<br>
+
+  ${
+    o.recibo
+      ? `<small><b>Rec:</b> ${o.recibo}</small><br>`
+      : ""
+  }
+
+  ${
+    (o.boleta_factura || o.boletaFactura)
+      ? `<small><b>B/F:</b> ${o.boleta_factura || o.boletaFactura}</small><br>`
+      : ""
+  }
+
+  ${
+    (o.observacion_pago || o.observacionPago)
+      ? `<small>${o.observacion_pago || o.observacionPago}</small><br>`
+      : ""
+  }
+
+  ${t.balance}: ${money(o.saldo, o.moneda)}<br>
+
+  <button
+    class="btn btn-sm btn-primary mt-1"
+    onclick="openPagoModal(${id})">
+      ${String(estado).toUpperCase() === "PAGADO"
+          ? "Ver pagos"
+          : t.pay}
+  </button>
+
+</div>
 `;
         }).join("") : "-"}</td>`;
       }
