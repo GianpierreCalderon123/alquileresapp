@@ -688,11 +688,17 @@ function renderMatriz() {
   });
 
   const rows = Object.values(grouped)
-    .filter(row =>
+  .filter(row => {
+    const coincideTexto =
       `${row.codigo || ""} ${row.propiedad || ""} ${row.propietarioActual || ""} ${row.tipo || ""}`
         .toLowerCase()
-        .includes(q)
-    )
+        .includes(q);
+
+    const tieneObligaciones =
+      Object.values(row.meses).some(lista => lista.length > 0);
+
+    return coincideTexto && tieneObligaciones;
+  })
     .sort((a, b) =>
       String(a.codigo || "").localeCompare(
         String(b.codigo || ""),
