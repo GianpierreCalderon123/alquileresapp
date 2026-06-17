@@ -1457,7 +1457,7 @@ async function openPagoModal(id) {
   modals.pago.show();
 }
 
-async function editarDatosPago(id, fecha, observacion, recibo, boletafactura) {
+async function editarDatosPago(id, fecha, observacion, recibo, boletaFactura) {
   const nuevaFecha = prompt("Fecha de pago", fecha || "");
   if (nuevaFecha === null) return;
 
@@ -1467,8 +1467,8 @@ async function editarDatosPago(id, fecha, observacion, recibo, boletafactura) {
   const nuevoRecibo = prompt("Recibo", recibo || "");
   if (nuevoRecibo === null) return;
 
-  const nuevoBoletaFactura = prompt("BoletaFactura", boletafactura || "");
-  if (nuevoBoletaFactura === null) return;
+  const nuevaBoletaFactura = prompt("Boleta / Factura", boletaFactura || "");
+  if (nuevaBoletaFactura === null) return;
 
   await api(`/pagos/${id}/datos`, {
     method: "PATCH",
@@ -1476,7 +1476,7 @@ async function editarDatosPago(id, fecha, observacion, recibo, boletafactura) {
       fechaPago: nuevaFecha,
       observacion: nuevaObs,
       recibo: nuevoRecibo,
-      boletafactura: nuevoBoletaFactura
+      boletaFactura: nuevaBoletaFactura
     })
   });
 
@@ -1498,7 +1498,7 @@ async function registrarPago() {
       fechaPago: $("pagoFecha").value,
       observacion: $("pagoObs").value,
       recibo: $("pagoRecibo").value,
-      boletafactura: $("pagoBoletaFactura").value
+      boletaFactura: $("pagoBoletaFactura").value
     };
 
     await api("/pagos", {
