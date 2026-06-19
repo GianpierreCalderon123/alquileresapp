@@ -282,32 +282,29 @@ async function exportarReportePagos() {
     anio: $("reportePagoAnio")?.value || anio()
   });
 
-  if ($("reportePagoMes")?.value) {
-    q.set("mes", $("reportePagoMes").value);
-  }
-
-  if ($("reportePagoConcepto")?.value) {
-    q.set("conceptoId", $("reportePagoConcepto").value);
-  }
+  if ($("reportePagoMes")?.value) q.set("mes", $("reportePagoMes").value);
+  if ($("reportePagoConcepto")?.value) q.set("conceptoId", $("reportePagoConcepto").value);
 
   const pagos = await api(`/pagos?${q}`);
 
   const wb = XLSX.utils.book_new();
   const ws = {};
-
   const border = excelBorder();
-  const cols = 9;
 
-  const year = $("reportePagoAnio")?.value || anio();
-  const month = $("reportePagoMes")?.value
-    ? meses[Number($("reportePagoMes").value) - 1]
-    : "Todos";
-  const concepto = $("reportePagoConcepto")?.value
-    ? state.conceptos.find(c => String(c.id) === String($("reportePagoConcepto").value))?.nombre
-    : "Todos";
+  const headers = [
+    "Fecha / 日期",
+    "Pago / 付款",
+    "Tipo / 类型",
+    "Propiedad / 物业",
+    "Concepto / 项目",
+    "Monto / 金额",
+    "Moneda / 货币",
+    "Recibo / 收据",
+    "Boleta-Factura / 发票",
+    "Observación / 备注"
+  ];
 
-  const title =
-    `Reporte de Pagos - ${year} - ${month} - ${concepto} / ${year} - ${month} - ${concepto} 付款报表`;
+  const cols = headers.length;
 
   const titleStyle = {
     fill: { fgColor: { rgb: "FFF200" } },
@@ -316,84 +313,174 @@ async function exportarReportePagos() {
     border
   };
 
-  const headerStyle = {
+  const groupStyle = {
     fill: { fgColor: { rgb: "A9D18E" } },
     font: { bold: true },
-    alignment: { horizontal: "center", vertical: "center" },
+    alignment: { horizontal: "left", vertical: "center" },
+    border
+  };
+
+  const headerStyle = {
+    fill: { fgColor: { rgb: "D9EAD3" } },
+    font: { bold: true },
+    alignment: { horizontal: "center", vertical: "center", wrapText: true },
+    border
+  };
+
+  const subtotalStyle = {
+    fill: { fgColor: { rgb: "FCE4D6" } },
+    font: { bold: true },
     border
   };
 
   const totalStyle = {
+    fill: { fgColor: { rgb: "FFD966" } },
     font: { bold: true },
-    fill: { fgColor: { rgb: "F2F2F2" } },
     border
   };
 
-  ws["A1"] = excelCell(title, titleStyle);
+  const year = $("reportePagoAnio")?.value || anio();
+  const month = $("reportePagoMes")?.value
+    ? meses[Number($("reportePagoMes").value) - 1]
+    : "Todos";
+
+  const conceptoFiltro = $("reportePagoConcepto")?.value
+    ? state.conceptos.find(c => String(c.id) === String($("reportePagoConcepto").value))?.nombre
+    : "Todos";
+
+  ws["A1"] = excelCell(
+    `Reporte de Pagos - ${year} - ${month} - ${conceptoFiltro} / 付款报表`,
+    titleStyle
+  );
+
   ws["!merges"] = [
     { s: { r: 0, c: 0 }, e: { r: 0, c: cols - 1 } }
   ];
 
-  const headers = [
-    "Fecha / 日期",
-    "Pago / 付款",
-    "Tipo / 类型",
-    "Propiedad / 物业",
-    "Concepto / 项目",
-    "Detalles / 明细",
-    "Monto / 金额",
-    "Moneda / 货币",
-    "Observación / 备注"
-  ];
-
-  headers.forEach((h, i) => {
-    ws[XLSX.utils.encode_cell({ r: 2, c: i })] = excelCell(h, headerStyle);
-  });
-
-  let row = 3;
-  let total = 0;
+  const grupos = {};
+  const totalMoneda = {};
 
   pagos.forEach(p => {
-    total += Number(p.monto || 0);
+    const moneda = p.moneda || "SIN MONEDA";
+    const concepto = p.concepto || "SIN CONCEPTO";
+    const key = `${moneda}||${concepto}`;
 
-    const values = [
-      date(p.fecha_pago || p.fechaPago),
-      `#${p.id}`,
-      p.tipo_pago || p.tipoPago || "-",
-      p.propiedad || "-",
-      p.concepto || "-",
-      p.cantidad_detalles || p.cantidadDetalles || 1,
-      Number(p.monto || 0),
-      p.moneda || "-",
-      p.observacion || "-"
-    ];
+    if (!grupos[key]) {
+      grupos[key] = {
+        moneda,
+        concepto,
+        items: [],
+        subtotal: 0
+      };
+    }
 
-    values.forEach((v, c) => {
-      ws[XLSX.utils.encode_cell({ r: row, c })] =
-        excelCell(v, c === 6 ? { numFmt: "#,##0.00" } : {});
+    const monto = Number(p.monto || 0);
+    grupos[key].items.push(p);
+    grupos[key].subtotal += monto;
+
+    if (!totalMoneda[moneda]) totalMoneda[moneda] = 0;
+    totalMoneda[moneda] += monto;
+  });
+
+  let row = 2;
+
+  Object.values(grupos)
+    .sort((a,b) =>
+      a.moneda.localeCompare(b.moneda) ||
+      a.concepto.localeCompare(b.concepto)
+    )
+    .forEach(g => {
+      ws[XLSX.utils.encode_cell({ r: row, c: 0 })] =
+        excelCell(`Moneda: ${g.moneda} | Concepto: ${g.concepto}`, groupStyle);
+
+      ws["!merges"].push({
+        s: { r: row, c: 0 },
+        e: { r: row, c: cols - 1 }
+      });
+
+      row++;
+
+      headers.forEach((h, i) => {
+        ws[XLSX.utils.encode_cell({ r: row, c: i })] = excelCell(h, headerStyle);
+      });
+
+      row++;
+
+      g.items.forEach(p => {
+        const values = [
+          date(p.fecha_pago || p.fechaPago),
+          `#${p.id}`,
+          p.tipo_pago || p.tipoPago || "-",
+          p.propiedad || "-",
+          p.concepto || "-",
+          Number(p.monto || 0),
+          p.moneda || "-",
+          p.recibo || "-",
+          p.boleta_factura || p.boletaFactura || "-",
+          p.observacion || "-"
+        ];
+
+        values.forEach((v, c) => {
+          ws[XLSX.utils.encode_cell({ r: row, c })] =
+            excelCell(v, c === 5 ? { numFmt: "#,##0.00" } : {});
+        });
+
+        row++;
+      });
+
+      ws[XLSX.utils.encode_cell({ r: row, c: 0 })] =
+        excelCell(`Subtotal ${g.moneda} - ${g.concepto}`, subtotalStyle);
+
+      ws["!merges"].push({
+        s: { r: row, c: 0 },
+        e: { r: row, c: 4 }
+      });
+
+      ws[XLSX.utils.encode_cell({ r: row, c: 5 })] =
+        excelCell(g.subtotal, { ...subtotalStyle, numFmt: "#,##0.00" });
+
+      for (let c = 6; c < cols; c++) {
+        ws[XLSX.utils.encode_cell({ r: row, c })] = excelCell("", subtotalStyle);
+      }
+
+      row += 2;
     });
+
+  ws[XLSX.utils.encode_cell({ r: row, c: 0 })] =
+    excelCell("TOTALES POR MONEDA / 按货币合计", totalStyle);
+
+  ws["!merges"].push({
+    s: { r: row, c: 0 },
+    e: { r: row, c: cols - 1 }
+  });
+
+  row++;
+
+  Object.entries(totalMoneda).forEach(([moneda, total]) => {
+    ws[XLSX.utils.encode_cell({ r: row, c: 0 })] =
+      excelCell(moneda, totalStyle);
+
+    ws[XLSX.utils.encode_cell({ r: row, c: 5 })] =
+      excelCell(Number(total || 0), { ...totalStyle, numFmt: "#,##0.00" });
 
     row++;
   });
 
-  ws[XLSX.utils.encode_cell({ r: row, c: 0 })] = excelCell("Total / 合计", totalStyle);
-  ws[XLSX.utils.encode_cell({ r: row, c: 6 })] =
-    excelCell(total, { ...totalStyle, numFmt: "#,##0.00" });
-
   ws["!ref"] = XLSX.utils.encode_range({
     s: { r: 0, c: 0 },
-    e: { r: row, c: cols - 1 }
+    e: { r: Math.max(row, 5), c: cols - 1 }
   });
 
   ws["!cols"] = [
     { wch: 14 },
     { wch: 12 },
     { wch: 14 },
-    { wch: 30 },
+    { wch: 32 },
     { wch: 24 },
-    { wch: 12 },
     { wch: 14 },
     { wch: 12 },
+    { wch: 18 },
+    { wch: 20 },
     { wch: 35 }
   ];
 
@@ -404,7 +491,6 @@ async function exportarReportePagos() {
     `reporte_pagos_${empresaId()}_${year}_${month}.xlsx`
   );
 }
-
 async function loadMonedas() {
   state.monedas = await api("/monedas");
   fillMonedas();
