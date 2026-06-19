@@ -263,13 +263,17 @@ async function initApp() {
 }
 
 async function refreshMain() {
-  await Promise.all([
+  await loadMatriz();
+
+  Promise.all([
     loadDashboard(),
     loadObligaciones(),
-    loadMatriz(),
     loadDashboardMensual()
-  ]);
-  if ($("tablaReportePagos")) await loadReportePagos();
+  ]).catch(err);
+
+  if ($("tablaReportePagos")) {
+    loadReportePagos().catch(err);
+  }
 }
 
 async function exportarReportePagos() {
@@ -474,18 +478,25 @@ async function loadReportePagos() {
 
 
 async function loadMatriz() {
-  const q = new URLSearchParams({
-    empresaId: empresaId(),
-    anio: $("filtroAnio")?.value || anio()
-  });
+  try {
+    setMatrizLoading(true);
 
-  if ($("filtroConcepto")?.value) q.set("conceptoId", $("filtroConcepto").value);
-  if ($("filtroEstado")?.value) q.set("estado", $("filtroEstado").value);
+    const q = new URLSearchParams({
+      empresaId: empresaId(),
+      anio: $("filtroAnio")?.value || anio()
+    });
 
-  state.matriz = (await api(`/matriz-pagos?${q}`))
-  .sort((a,b) => String(a.codigo).localeCompare(String(b.codigo), "es", { numeric:true }));
-  renderMatriz();
-  renderReporteIngresos();
+    if ($("filtroConcepto")?.value) q.set("conceptoId", $("filtroConcepto").value);
+    if ($("filtroEstado")?.value) q.set("estado", $("filtroEstado").value);
+
+    state.matriz = (await api(`/matriz-pagos?${q}`))
+      .sort((a,b) => String(a.codigo).localeCompare(String(b.codigo), "es", { numeric:true }));
+
+    renderMatriz();
+    renderReporteIngresos();
+  } catch(e) {
+    err(e);
+  }
 }
 
 async function loadHistoriales() {
@@ -1366,6 +1377,25 @@ async function savePropietario() {
     err(e);
   }
 }
+
+function setMatrizLoading(loading) {
+  const btn = document.querySelector("button[onclick='refreshMain()']");
+  if (btn) btn.disabled = loading;
+
+  if ($("tbodyMatriz")) {
+    $("tbodyMatriz").innerHTML = loading
+      ? `
+        <tr>
+          <td colspan="14" class="text-center p-4">
+            <div class="spinner-border text-primary" role="status"></div>
+            <div class="mt-2">Cargando matriz...</div>
+          </td>
+        </tr>
+      `
+      : $("tbodyMatriz").innerHTML;
+  }
+}
+
 
 function openGenerarModal() {
   setup();
